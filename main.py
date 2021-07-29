@@ -137,6 +137,7 @@ def waypointer():
     if label == "leave":    wpList = imported_script.label_leave(wp)
     if label == "go_refil": wpList = imported_script.label_go_refil(wp)
     
+    #list of possible waypoint actions
     if   wpList[0] == "walk" and running == 1: walk(wpList)
     elif wpList[0] in ("rope","ladder","shovel"): waypoint_action(wpList[0])
     elif wpList[0] == "drop": drop_item(wpList)
@@ -147,9 +148,9 @@ def waypointer():
     elif wpList[0] == "refil": buy_item(wpList[1],wpList[2])
     elif wpList[0] == "reset": reset_run()
     elif wpList[0] == "pass": pass
-    else: print "ERROR on waypoint",wp,"(",wpList[0],")"
+    else: print "WARNING: error on waypoint",wp,":",wpList[0]
        
-    ### Arrived/Concluded waypoint shenanigans ###
+    #Arrived at waypoint
     if label == "go_hunt" and wp >= last_go_hunt_wp:
         log("Setting label to hunt")
         label = "hunt"
@@ -159,60 +160,64 @@ def waypointer():
         if drop_vials > 0 and running == 1: 
             check_battle_list()
             drop_item_vial()
-                    
-        if not leave_conditions:
-            log("Checking exit conditions...")
-            try:
-                label = imported_script.exit_conditions() 
-            except: 
-                log("ERROR checking exit conditions, leaving hunt")       
-                label = "leave"
-        else: 
-            log("Checking leave conditions...")
-            for condition in leave_conditions:
-                index = (leave_conditions.index(condition)) + 1
-                log("Condition "+str(index)+": "+condition[0])
-                label = check_leave_conditions(condition[0],condition[1])
+        
+        log("Checking conditions to leave hunt...")
+        for condition in leave_conditions:
+            index = (leave_conditions.index(condition)) + 1
+            log("Condition "+str(index)+": "+condition[0])
+            label = check_leave_conditions(condition[0],condition[1])
+            if label == "leave": break #if a leave condition is found, shoul not check for another
 
         #set next wp back to 1         
         wp = 1
         
     elif label == "leave" and wp >= last_leave_wp:
         logoff_function()
-        
+    
     else: wp+=1
 
 
-def check_leave_conditions(name,qtd):
-
-    #check if it's a potion
+def check_leave_conditions(name,param):
+    
+    #check if potion
     if "potion" in name:
         
-        if name == "mana potion":
-            while qtd >= 0:
-                #log("Testing if "+name+" >= "+str(qtd))
-                img_ref = potions.mana_potion_dict[qtd]
+        try:
+            while param >= 0:
+                if name == "small health potion": img_ref = potions.small_health_potion_dict[param]
+                if name == "mana potion":         img_ref = potions.mana_potion_dict[param]
+                if name == "strong mana potion":  img_ref = potions.strong_mana_potion_dict[param]  
+                #log("Checking if "+name+" <= "+str(param))
                 if exists(img_ref,0): return "leave"
-                else: qtd -= 10
+                else: 
+                    if param == 0: param = -1
+                    else: param -= param
             else: return "hunt" 
             
-        elif name == "strong mana potion":
-            while qtd >= 0:
-                #log("Testing if "+name+" >= "+str(qtd))
-                img_ref = potions.strong_mana_potion_dict[qtd]
-                if exists(img_ref,0): return "leave"
-                else: qtd -= 10
-            else: return "hunt" 
-            
-        else: 
-            print "ERROR: \'",name,"\' not implemented"
+        except: 
+            log("WARNING: ",name," not implemented!")
             return "leave"
 
-    #if not a potion, use variable qtd as pattern
+    #if its a time-based condition (like server save)
+    elif name == "time":
+        return check_time(param[0],param[1])
+        
+    #if not a potion, use variable param as pattern
     else: 
-        if exists(qtd,0): return "leave"
+        if exists(param,0): return "leave"
         else: return "hunt"
 
+#check current machine time
+def check_time(interval_1,interval_2):
+
+    current_time = datetime.now().strftime("%H:%M") 
+    print "Current time:",current_time
+    if current_time >= interval_1 and current_time <= interval_2:
+        return "leave"
+    else:
+        return "hunt"        
+        
+        
 def walk(wpList):
 #wpList = [0:action, 1:img ,2:zoom, 3:atk]   
 
@@ -326,9 +331,14 @@ def waypoint_action(wp_action):
 def reset_run():
     global wp
     global label
-    next_label = imported_script.exit_conditions()
+
+    for condition in leave_conditions:
+        index = (leave_conditions.index(condition)) + 1
+        next_label = check_leave_conditions(condition[0],condition[1])
+        if next_label == "leave": break #if a leave condition is found, shoul not check for another
+
     if next_label == "hunt":
-        log("Reseting hunt")
+        log("Restarting hunt from the beginning")
         label = "go_hunt"
         wp = 0
     else:
@@ -760,29 +770,7 @@ def dust_creature_corpse(list_of_corpses):
 def script_selector_function():
     script_list = (
             "-nothing selected-",
-            "Rook Mino Hell",
-            "Rook Wolf PA",
-            "Ab Wasp Cave",
-            "Sabretooth",  
-            "Rope Belt",
-            "Bloody Pincers",
-            "Lb Braindeath",
-            "Krailos Ruins",
-            "Feyrist Beach",
-            "Edron Vampire Crypt",
-            "Exotic Cave -1",
-            "Feyrist Mini Rosha",
-            "Hive Tower South East",
-            "Krailos Bug Cave -2",
-            "Brimstone Bugs",
-            "Feyrist Dark Cave -2",
-            "Banuta -1",
-            "Hero -3",
-            "Yh War Golem",
-            "PH Behemoths",
-            "Oramond West",
-            "LB Quaras -1",
-            "Edron Orc Cults"
+            "Rook Mino Hell"
     )
     
     prompt = select("Please select a script from the list","Available Scripts", options = script_list, default = script_list[0])
@@ -790,29 +778,6 @@ def script_selector_function():
     global selected_script
     
     if   prompt == script_list[1]:  selected_script = "mino_hell"
-    elif prompt == script_list[2]:  selected_script = "wolfs_pa"   
-    elif prompt == script_list[3]:  selected_script = "ab_wasp" 
-    elif prompt == script_list[4]:  selected_script = "mutated_tiger"
-    elif prompt == script_list[5]:  selected_script = "yalahar_cults" 
-    elif prompt == script_list[6]:  selected_script = "sea_serpent_n"
-    elif prompt == script_list[7]:  selected_script = "lb_braindeath"             
-    elif prompt == script_list[8]:  selected_script = "krailos_ruins" 
-    elif prompt == script_list[9]:  selected_script = "feyrist_beach"  
-    elif prompt == script_list[10]: selected_script = "vamp_crypt"   
-    elif prompt == script_list[11]: selected_script = "exotic_cave"   
-    elif prompt == script_list[12]: selected_script = "mini_rosha"   
-    elif prompt == script_list[13]: selected_script = "hive_outside"
-    elif prompt == script_list[14]: selected_script = "krailos_bug2"
-    elif prompt == script_list[15]: selected_script = "mp_brimstone"
-    elif prompt == script_list[16]: selected_script = "feyrist_dark_cave"
-    elif prompt == script_list[17]: selected_script = "banuta1"
-    elif prompt == script_list[18]: selected_script = "hero2"
-    elif prompt == script_list[19]: selected_script = "war_golem"
-    elif prompt == script_list[20]: selected_script = "ph_behemoth"
-    elif prompt == script_list[21]: selected_script = "oramond_west"
-    elif prompt == script_list[22]: selected_script = "lb_quaras1"
-    elif prompt == script_list[23]: selected_script = "edron_orc_cult"
-
     else:
         popup("The selected script is not valid!")
         closeFrame(0)
@@ -859,11 +824,7 @@ def script_selector_function():
     last_go_hunt_wp = imported_script.last_go_hunt_wp
 
     #leave hunt conditions list
-    try: 
-        leave_conditions = imported_script.leave_conditions
-    except: 
-        leave_conditions = []
-        pass
+    leave_conditions = imported_script.leave_conditions
     
     #imports healing list
     healing   = imported_script.healing
@@ -935,7 +896,8 @@ def log(message):
 def closeFrame(event):
     global running
     running = 0
-    frame.dispose()
+    quitButton.setEnabled(False)
+    if console != "complex": frame.dispose()
 
 #COMPLEX
 def complex_console():
@@ -950,7 +912,8 @@ def complex_console():
     frame.contentPane.layout = FlowLayout()
     
     #add QUIT button
-    quitButton = JButton("QUIT", actionPerformed = closeFrame)
+    global quitButton
+    quitButton = JButton("STOP", actionPerformed = closeFrame)
     quitButton.setForeground(Color.RED)
     quitButton.setPreferredSize(Dimension(100,100))
     frame.contentPane.add(quitButton)
@@ -974,12 +937,15 @@ def simple_console():
     frame = JFrame("[BETA] GameMaster Bot - Log")
     frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE)
     frame.setBounds(frame_x,frame_y,560,30)
+    
     global messageLOG
     messageLOG = JLabel("")
     frame.add(messageLOG,BorderLayout.CENTER)
-    button = JButton("QUIT", actionPerformed =closeFrame)
-    button.setForeground(Color.RED)
-    frame.add(button,BorderLayout.WEST)
+    
+    global quitButton
+    quitButton = JButton("QUIT", actionPerformed =closeFrame)
+    quitButton.setForeground(Color.RED)
+    frame.add(quitButton,BorderLayout.WEST)
     frame.setUndecorated(True)
     frame.setAlwaysOnTop(True)
     frame.setVisible(True)
