@@ -25,15 +25,7 @@ Settings.ActionLogs = 0
 Settings.InfoLogs = 0
 Settings.DebugLogs = 0
 
-############################################################
- ######   #######  ##    ## ######## ####  ######    ######  
-##    ## ##     ## ###   ## ##        ##  ##    ##  ##    ## 
-##       ##     ## ####  ## ##        ##  ##        ##       
-##       ##     ## ## ## ## ######    ##  ##   ####  ######  
-##       ##     ## ##  #### ##        ##  ##    ##        ## 
-##    ## ##     ## ##   ### ##        ##  ##    ##  ##    ## 
- ######   #######  ##    ## ##       ####  ######    ######  
-############################################################
+#CONFIGS
 
 #options: simple/complex
 console = "complex"
@@ -59,15 +51,7 @@ haste     = "b"
 #defines game region
 game_region = Region(223,121,483,353)
 
-##########################################
-########  #### ##     ## ######## ##       
-##     ##  ##   ##   ##  ##       ##       
-##     ##  ##    ## ##   ##       ##       
-########   ##     ###    ######   ##       
-##         ##    ## ##   ##       ##       
-##         ##   ##   ##  ##       ##       
-##        #### ##     ## ######## ########
-##########################################
+#PIXEL ANALYZER
 
 def pixelColor(posX,posY):   
     pixel = Robot().getPixelColor(posX,posY)
@@ -84,15 +68,7 @@ def healerColor(posX,posY,id):
     elif id == "mana": return pixel.getBlue() 
     else: return 0
 
-###########################################################
-##        #######   ######       #######  ######## ######## 
-##       ##     ## ##    ##     ##     ## ##       ##       
-##       ##     ## ##           ##     ## ##       ##       
-##       ##     ## ##   ####    ##     ## ######   ######   
-##       ##     ## ##    ##     ##     ## ##       ##       
-##       ##     ## ##    ##     ##     ## ##       ##       
-########  #######   ######       #######  ##       ##       
-###########################################################
+#LOG OFF FUNCTION
 
 def logoff_function():
     
@@ -115,15 +91,8 @@ def logoff_function():
         global running
         running = 0
 
-########################################################################
-##      ##    ###    ##    ## ########   #######  #### ##    ## ######## 
-##  ##  ##   ## ##    ##  ##  ##     ## ##     ##  ##  ###   ##    ##    
-##  ##  ##  ##   ##    ####   ##     ## ##     ##  ##  ####  ##    ##    
-##  ##  ## ##     ##    ##    ########  ##     ##  ##  ## ## ##    ##    
-##  ##  ## #########    ##    ##        ##     ##  ##  ##  ####    ##    
-##  ##  ## ##     ##    ##    ##        ##     ##  ##  ##   ###    ##    
- ###  ###  ##     ##    ##    ##         #######  #### ##    ##    ##    
-########################################################################
+#WAYPOINT
+
 current_zoom = -1
 
 #controls waypoints
@@ -132,10 +101,10 @@ def waypointer():
     global wp
     global label
     
-    if label == "go_hunt":  wpList = imported_script.label_go_hunt(wp)
-    if label == "hunt":     wpList = imported_script.label_hunt(wp)
-    if label == "leave":    wpList = imported_script.label_leave(wp)
-    if label == "go_refil": wpList = imported_script.label_go_refil(wp)
+    if label == "go_hunt":  wpList = imported_script.label_go_hunt[wp]
+    if label == "hunt":     wpList = imported_script.label_hunt[wp]
+    if label == "leave":    wpList = imported_script.label_leave[wp]
+    if label == "go_refil": wpList = imported_script.label_go_refil[wp]
     
     #list of possible waypoint actions
     if   wpList[0] == "walk" and running == 1: walk(wpList)
@@ -148,7 +117,7 @@ def waypointer():
     elif wpList[0] == "refil": buy_item(wpList[1],wpList[2])
     elif wpList[0] == "reset": reset_run()
     elif wpList[0] == "pass": pass
-    else: print "WARNING: error on waypoint",wp,":",wpList[0]
+    else: log("WARNING: error on waypoint"+str(wp)+":"+wpList[0])
        
     #Arrived at waypoint
     if label == "go_hunt" and wp >= last_go_hunt_wp:
@@ -184,9 +153,10 @@ def check_leave_conditions(name,param):
         
         try:
             while param >= 0:
-                if name == "small health potion": img_ref = potions.small_health_potion_dict[param]
-                if name == "mana potion":         img_ref = potions.mana_potion_dict[param]
-                if name == "strong mana potion":  img_ref = potions.strong_mana_potion_dict[param]  
+                if name == "small health potion":    img_ref = potions.small_health_potion_dict[param]
+                if name == "mana potion":            img_ref = potions.mana_potion_dict[param]
+                if name == "strong mana potion":     img_ref = potions.strong_mana_potion_dict[param]
+                if name == "ultimate health potion": img_ref = potions.ultimate_health_potion_dict[param]  
                 #log("Checking if "+name+" <= "+str(param))
                 if exists(img_ref,0): return "leave"
                 else: 
@@ -211,7 +181,7 @@ def check_leave_conditions(name,param):
 def check_time(interval_1,interval_2):
 
     current_time = datetime.now().strftime("%H:%M") 
-    print "Current time:",current_time
+    #print "Current time:",current_time
     if current_time >= interval_1 and current_time <= interval_2:
         return "leave"
     else:
@@ -241,6 +211,7 @@ def walk(wpList):
         
         #click the match on screen
         click(wpList[1])
+        hover(Location(x2,y2))
 
         #check if should cast haste
         if not use_haste: pass
@@ -344,15 +315,8 @@ def reset_run():
     else:
         label = "leave"
         
-#######################################################
-########     ###    ######## ######## ##       ######## 
-##     ##   ## ##      ##       ##    ##       ##       
-##     ##  ##   ##     ##       ##    ##       ##       
-########  ##     ##    ##       ##    ##       ######   
-##     ## #########    ##       ##    ##       ##       
-##     ## ##     ##    ##       ##    ##       ##       
-########  ##     ##    ##       ##    ######## ######## 
-#######################################################
+#BATTLE
+
 in_battle = 0
         
 def check_battle_list():
@@ -380,9 +344,8 @@ def check_battle_list():
         in_battle = 1
         battlelist_region.waitVanish("bl_target.png",30)    
         in_battle = 0
-        
-        if game_region.exists("valuable_loot.png",0): loot_around(2)
         if loot_type == 1 and label == "hunt": loot_around(1)
+        if loot_type == 2 and game_region.exists("valuable_loot.png",0): loot_around(2)
         check_battle_list()
 
     elif running == 0: return    
@@ -394,21 +357,13 @@ def check_battle_list():
             try: dust_creature_corpse(imported_script.corpses)
             except: pass
         return
- 
-#####################################
-##        #######   #######  ######## 
-##       ##     ## ##     ##    ##    
-##       ##     ## ##     ##    ##    
-##       ##     ## ##     ##    ##    
-##       ##     ## ##     ##    ##    
-##       ##     ## ##     ##    ##    
-########  #######   #######     ##    
-#####################################
+
+#LOOT
 
 #loot_type = 0 -> ignore loot
 #loot_type = 1 -> loot everything
 #loot_type = 2 -> loot only valuable
-#loot_type = 3 -> loot only after clearing the battle list (best used along lure mode)
+#loot_type = 3 -> loot only after clearing the battle list (best used with lure mode)
 
 def loot_around(times):
     log("Looting around char ("+str(times)+")")
@@ -423,15 +378,8 @@ def loot_around(times):
         click(Location(x2,y3),8)
         click(Location(x3,y3),8)
 
-#######################################################
-##     ##  #######  ######## ##    ## ######## ##    ## 
-##     ## ##     ##    ##    ##   ##  ##        ##  ##  
-##     ## ##     ##    ##    ##  ##   ##         ####   
-######### ##     ##    ##    #####    ######      ##    
-##     ## ##     ##    ##    ##  ##   ##          ##    
-##     ## ##     ##    ##    ##   ##  ##          ##    
-##     ##  #######     ##    ##    ## ########    ##    
-#######################################################
+#USE/CAST/SEND HOTKEYS
+
 LTU_obj  = datetime.now()
 LTU_heal_spell = datetime.now()  
 
@@ -452,15 +400,25 @@ def validate_hotkey(group,LTU,cd):
         if diff >= cd: return 1
         else: return 0
 
-#####################################
-##     ## ########    ###    ##      
-##     ## ##         ## ##   ##      
-##     ## ##        ##   ##  ##      
-######### ######   ##     ## ##      
-##     ## ##       ######### ##      
-##     ## ##       ##     ## ##      
-##     ## ######## ##     ## ########
-#####################################
+function_keys = ["F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"]
+
+function_keys_dict = {
+
+        "F1": Key.F1,
+        "F2": Key.F2,
+        "F3": Key.F3,
+        "F4": Key.F4,
+        "F5": Key.F5,
+        "F6": Key.F6,
+        "F7": Key.F7,
+        "F8": Key.F8,
+        "F9": Key.F9,
+        "F10": Key.F10,
+        "F11": Key.F11,
+        "F12": Key.F12
+}
+
+#HEAL
 
 #Healing thread
 def healing_thread(arg):
@@ -476,7 +434,11 @@ def healing_thread(arg):
                 valid = validate_hotkey(heal[4],heal[6],heal[5])
                 if valid == 1:  
                     log(heal[0]+" < " +str(heal[2])+"%: Using "+str(heal[1]))
-                    type(heal[3])
+                    #
+                    if heal[3] in function_keys: 
+                        type(function_keys_dict[heal[3]])
+                    else:
+                        type(heal[3])
                     heal[6] = datetime.now()
                     
     else: print "Ending healing thread" 
@@ -517,15 +479,7 @@ def start_healing_thread():
     else: 
         print "[ERROR] Healing thread already running"
 
-########################################################
-########    ###    ########   ######   ######## ########
-   ##      ## ##   ##     ## ##    ##  ##          ##   
-   ##     ##   ##  ##     ## ##        ##          ##   
-   ##    ##     ## ########  ##   #### ######      ##   
-   ##    ######### ##   ##   ##    ##  ##          ##   
-   ##    ##     ## ##    ##  ##    ##  ##          ##   
-   ##    ##     ## ##     ##  ######   ########    ##   
-########################################################
+#TARGET
 
 def count_targets(slots):
 
@@ -561,7 +515,10 @@ def attacking_thread(arg):
                                 
                 if validate_hotkey(atk[3],atk[5],atk[4]) == 1:
                     log("Casting "+atk[0])
-                    type(atk[1])
+                    if atk[1] in function_keys: 
+                        type(function_keys_dict[atk[1]])
+                    else:
+                        type(atk[1])
                     atk[5] = datetime.now()
                     if "exeta" in atk[0]: sleep(0)
                     else: sleep(2)
@@ -578,15 +535,7 @@ def start_attacking_thread():
     else: 
         print "[ERROR] Attacking thread already running"
 
-#################################################################
-########  ######## ########  ##     ## ######## ########  ######  
-##     ## ##       ##     ## ##     ## ##       ##       ##    ## 
-##     ## ##       ##     ## ##     ## ##       ##       ##       
-##     ## ######   ########  ##     ## ######   ######    ######  
-##     ## ##       ##     ## ##     ## ##       ##             ## 
-##     ## ##       ##     ## ##     ## ##       ##       ##    ## 
-########  ######## ########   #######  ##       ##        ######  
-#################################################################
+#CHARACTER STATUS AND DEBUFFS
 
 def check_debuffs():
     log("Checking status and debuffs")
@@ -597,15 +546,7 @@ def check_debuffs():
     if (equip_amulet == 1 and equip_region.exists("amulet.png",0)): type (amulet)
     else:return
 
-#######################################
-########  ########   #######  ########  
-##     ## ##     ## ##     ## ##     ## 
-##     ## ##     ## ##     ## ##     ## 
-##     ## ########  ##     ## ########  
-##     ## ##   ##   ##     ## ##        
-##     ## ##    ##  ##     ## ##        
-########  ##     ##  #######  ##        
-#######################################
+#DROP ITEMS TO GROUND
 
 def drop_item_vial():
     log("Searching for vials to drop...")
@@ -633,15 +574,7 @@ def drop_item_to_sqm(sprite,name):
             wait(0.5)
     else: return
     
-################################################################################
-########  ######## ########   #######   ######  #### ######## ######## ########  
-##     ## ##       ##     ## ##     ## ##    ##  ##     ##    ##       ##     ## 
-##     ## ##       ##     ## ##     ## ##        ##     ##    ##       ##     ## 
-##     ## ######   ########  ##     ##  ######   ##     ##    ######   ########  
-##     ## ##       ##        ##     ##       ##  ##     ##    ##       ##   ##   
-##     ## ##       ##        ##     ## ##    ##  ##     ##    ##       ##    ##  
-########  ######## ##         #######   ######  ####    ##    ######## ##     ## 
-################################################################################
+#DEPOSIT ITEMS ON DEPOT
 
 #get match closest to mouse location
 def by_nearest(match):
@@ -684,15 +617,7 @@ def deposit_item(list_of_items):
         log("ERROR: Could not deposit one or more items")
         return
 
-#####################################################################
-########  ######## ######## #### ##       ##       ######## ########  
-##     ## ##       ##        ##  ##       ##       ##       ##     ## 
-##     ## ##       ##        ##  ##       ##       ##       ##     ## 
-########  ######   ######    ##  ##       ##       ######   ########  
-##   ##   ##       ##        ##  ##       ##       ##       ##   ##   
-##    ##  ##       ##        ##  ##       ##       ##       ##    ##  
-##     ## ######## ##       #### ######## ######## ######## ##     ## 
-#####################################################################
+#TALK TO NPC AND BUY ITEMS ON TRADE
 
 def talk_to_npc(wpList):
     try: 
@@ -743,30 +668,13 @@ def buy_item(item,qtd):
     for i in range(qtd): more_icon.click()
     for i in range(hqtd): npc_trade_region.click("npc4.png")
 
-##############################################################################
-########  ##     ##  ######  ########       ##  ######  ##    ## #### ##    ## 
-##     ## ##     ## ##    ##    ##         ##  ##    ## ##   ##   ##  ###   ## 
-##     ## ##     ## ##          ##        ##   ##       ##  ##    ##  ####  ## 
-##     ## ##     ##  ######     ##       ##     ######  #####     ##  ## ## ## 
-##     ## ##     ##       ##    ##      ##           ## ##  ##    ##  ##  #### 
-##     ## ##     ## ##    ##    ##     ##      ##    ## ##   ##   ##  ##   ### 
-########   #######   ######     ##    ##        ######  ##    ## #### ##    ## 
-##############################################################################
-
+#DUST/SKIN CREATURE CORPSES
 def dust_creature_corpse(list_of_corpses):
     log("Searching for corpses to dust/skin")
     return
 
-#########################################################################
- ######  ######## ##       ########  ######  ########  #######  ########  
-##    ## ##       ##       ##       ##    ##    ##    ##     ## ##     ## 
-##       ##       ##       ##       ##          ##    ##     ## ##     ## 
- ######  ######   ##       ######   ##          ##    ##     ## ########  
-      ## ##       ##       ##       ##          ##    ##     ## ##   ##   
-##    ## ##       ##       ##       ##    ##    ##    ##     ## ##    ##  
- ######  ######## ######## ########  ######     ##     #######  ##     ##
-#########################################################################
-    
+#SCRIPT SELECTION
+
 def script_selector_function():
     script_list = (
             "-nothing selected-",
@@ -819,9 +727,9 @@ def script_selector_function():
     use_haste     = imported_script.use_haste
 
     #waypoints
-    last_hunt_wp    = imported_script.last_hunt_wp
-    last_leave_wp   = imported_script.last_leave_wp
-    last_go_hunt_wp = imported_script.last_go_hunt_wp
+    last_go_hunt_wp = len(imported_script.label_go_hunt)
+    last_hunt_wp    = len(imported_script.label_hunt)
+    last_leave_wp   = len(imported_script.label_leave)
 
     #leave hunt conditions list
     leave_conditions = imported_script.leave_conditions
@@ -865,15 +773,7 @@ def atk_parser(targeting):
         else: popup("ERROR: "+str(atk[0])+" not identified")
     print "Targeting parsed"  
         
-###############################################
-######## ########     ###    ##     ## ######## 
-##       ##     ##   ## ##   ###   ### ##       
-##       ##     ##  ##   ##  #### #### ##       
-######   ########  ##     ## ## ### ## ######   
-##       ##   ##   ######### ##     ## ##       
-##       ##    ##  ##     ## ##     ## ##       
-##       ##     ## ##     ## ##     ## ######## 
-###############################################
+#CONSOLE WINDOW/FRAME
 
 try: 
     localchat = find("local_chat.png")
@@ -899,7 +799,7 @@ def closeFrame(event):
     quitButton.setEnabled(False)
     if console != "complex": frame.dispose()
 
-#COMPLEX
+#Complex frame
 def complex_console():
     global frame
     #generates frame
@@ -931,7 +831,7 @@ def complex_console():
     frame.setVisible(True)
     log("Welcome to Game Master\'s Bot!")
 
-#SIMPLE
+#Simple frame
 def simple_console():
     global frame
     frame = JFrame("[BETA] GameMaster Bot - Log")
@@ -1036,40 +936,31 @@ y1 = gr_center_y - (screen_proportion*scp_perc)
 y2 = gr_center_y
 y3 = gr_center_y + (screen_proportion*scp_perc)
 
-#BATTLE LIST INFORMATIONS
+#Battle list region
 try: battlelist = find(Pattern("battlelist.png").similar(0.75))
 except: raise Exception("Battle list not found")
-
 bl_tlc_x = battlelist.getTopLeft().getX()
 bl_tlc_y = battlelist.getTopLeft().getY()
-
 bl_slot1_x = bl_tlc_x + 26
 bl_slot1_y = bl_tlc_y + 33
-
 battlelist_region = Region(bl_tlc_x,bl_tlc_y,40,200)
 
-#LIFE AND MANA INFORMATION
-
+#Life and mana bars region
 try: life_mana_bars = find(Pattern("life_mana_bars.png").exact())
 except: raise Exception("Life bars not found!")
 
-#EQUIP INFORMATIONS
-
+#Equipments region
 try: equip_coords = find("store_inbox.png")
 except: raise Exception("Equipment not found!")
-
 equip_coords_x = equip_coords.getTopRight().getX()+5
 equip_coords_y = equip_coords.getTopRight().getY()
-
 equip_region = Region((equip_coords_x-115),equip_coords_y,110,163)
 
-#MINIMAP REGION
+#Minimap region
 try: minimap_area = find("minimap_aux.png")
 except: raise Exception ("Minimap not found!")
-
 mma_aux_x = minimap_area.getTopLeft().getX()
 mma_aux_y = minimap_area.getTopLeft().getY()
-
 minimap_area_x = mma_aux_x - 115
 minimap_area_y = mma_aux_y - 49
 
@@ -1078,15 +969,7 @@ try:
     add_zoom = find(Pattern("add_zoom.png").exact())
 except: raise Exception ("Zoom buttons not found!")
     
-#################################
-##     ##    ###    #### ##    ## 
-###   ###   ## ##    ##  ###   ## 
-#### ####  ##   ##   ##  ####  ## 
-## ### ## ##     ##  ##  ## ## ## 
-##     ## #########  ##  ##  #### 
-##     ## ##     ##  ##  ##   ### 
-##     ## ##     ## #### ##    ## 
-#################################
+#MAIN
 
 #sets running variable to 1
 running = 1
