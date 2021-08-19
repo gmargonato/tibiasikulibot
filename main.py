@@ -27,9 +27,6 @@ Settings.DebugLogs = 0
 
 #CONFIGS
 
-#options: simple/complex
-console = "complex"
-
 #seconds before moving to next waypoint
 walk_interval = 2
 
@@ -45,8 +42,8 @@ food   = "u"
 dust   = "="
 
 #spells
-exana_pox = "i"
-haste     = "b"
+cure_poison = "i"
+haste       = "b"
 
 #defines game region
 game_region = Region(223,121,483,353)
@@ -87,7 +84,7 @@ def logoff_function():
         else:
            type("l", KeyModifier.CTRL) 
         log("[END OF EXECUTION]")
-        #closeFrame(0)
+        #pauseExecution(0)
         global running
         running = 0
 
@@ -112,11 +109,18 @@ def waypointer():
     elif wpList[0] == "drop": drop_item(wpList)
     elif wpList[0] == "talk": talk_to_npc(wpList)
     elif wpList[0] == "attack": check_battle_list()
-    elif wpList[0] == "deposit": deposit_item(wpList[1])
-    elif wpList[0] == "go_refil": label = "go_refil";wp = 0
+    elif wpList[0] == "deposit": deposit_item(wpList[1],wpList[2])
+    elif wpList[0] == "go_refil": 
+        label = "go_refil"
+        wp = 0
     elif wpList[0] == "refil": buy_item(wpList[1],wpList[2])
     elif wpList[0] == "reset": reset_run()
     elif wpList[0] == "pass": pass
+    elif wpList[0] == "use_item": 
+        try: click(wpList[1])
+        except: log("Item not found")
+    elif wpList[0] == "use_at": use_at(wpList[1],0)
+    elif wpList[0] == "use_item_at": use_at(wpList[1],wpList[2])
     else: log("WARNING: error on waypoint"+str(wp)+":"+wpList[0])
        
     #Arrived at waypoint
@@ -187,6 +191,36 @@ def check_time(interval_1,interval_2):
     else:
         return "hunt"        
         
+def use_at(param1,param2):
+    
+    #use_item: click on a position on screen. Best used with door
+    #use_item_at: uses and item on a position on screen.
+
+    # x1,y1 | x2,y1 | x3,y1
+    # x1,y2 | x2,y2 | x3,y2
+    # x1,y3 | x2,y3 | x3,y3
+    
+    pos_dict = {
+        "NW": Location(x1,y1),
+        "N":  Location(x2,y1),
+        "NE": Location(x3,y1),
+        "W":  Location(x1,y2),
+        "C":  Location(x2,y2),
+        "E":  Location(x3,y2),
+        "SW": Location(x1,y3),
+        "S":  Location(x2,y3),
+        "SE": Location(x3,y3)
+    }
+    
+    try:
+        #if parameter 2 is zero, translate param1 to screen coordinates    
+        if param2 == 0: click(pos_dict[param1.upper()])  
+        
+        #use param1 as item that will be used on param2 as coordinates
+        else:
+            click(param1)
+            click(pos_dict[param2.upper()])
+    except: log("Invalid position. Check documentation for examples.")
         
 def walk(wpList):
 #wpList = [0:action, 1:img ,2:zoom, 3:atk]   
@@ -213,9 +247,17 @@ def walk(wpList):
         click(wpList[1])
         hover(Location(x2,y2))
 
+        #if going or leaving hunt, and no way (possibly trapped), then attack
+        if game_region.exists(Pattern("thereisnoway.png").exact(),0):
+            log("unreachable destination, possibly trapped")
+            type(Key.SPACE)
+            wait(0.3)
+            battlelist_region.waitVanish("bl_target.png",5)
+            walk(wpList)
+
         #check if should cast haste
         if not use_haste: pass
-        elif (label == "go_hunt" and "go_hunt" in use_haste) or (label == "hunt" and "hunt" in use_haste) or (label == "leave" and "leave" in use_haste): type(haste)
+        elif label in use_haste: type(haste)
         else: pass
 
         #check if the character is moving or not
@@ -245,18 +287,8 @@ def check_is_walking(wpList):
             time_stopped = 0
             
             #while is walking and paralysed, use haste
-            while equip_region.exists("paralysed.png",0): 
-                type(haste)
-                wait(0.5)
-            
-            #if going or leaving hunt, and no way (possibly trapped), attack
-            if (wpList[0] == "go_hunt" or wpList[0] == "leave") and game_region.exists(Pattern("thereisnoway.png").exact(),0):
-                log("Possibly trapped")
-                type(Key.SPACE)
-                wait(0.3)
-                battlelist_region.waitVanish("bl_target.png",10)
-                walk(wpList)
-                    
+            if equip_region.exists("paralysed.png",0): type(haste)
+                     
             if wpList[3] > 0: 
                 if (not game_region.exists(Pattern("thereisnoway.png").exact(),0)) and (count_targets(wpList[3]) >= wpList[3]): 
                     type(Key.ESC)
@@ -335,7 +367,7 @@ def check_battle_list():
         #in case there is no way to the mob
         if check_no_way == 1: 
             if game_region.exists(Pattern("thereisnoway.png").exact(),0):
-                log("There is no way")
+                log("Unreachable creature")
                 type(Key.ESC)
                 if loot_type == 3: loot_around(1)
                 return
@@ -345,7 +377,7 @@ def check_battle_list():
         battlelist_region.waitVanish("bl_target.png",30)    
         in_battle = 0
         if loot_type == 1 and label == "hunt": loot_around(1)
-        if loot_type == 2 and game_region.exists("valuable_loot.png",0): loot_around(2)
+        if loot_type == 2 and game_region.exists(Pattern("valuable_loot.png").similar(0.90),0): loot_around(2)
         check_battle_list()
 
     elif running == 0: return    
@@ -537,16 +569,16 @@ def start_attacking_thread():
 
 #CHARACTER STATUS AND DEBUFFS
 
-def check_debuffs():
-    log("Checking status and debuffs")
-    #while equip_region.exists("paralysed.png",0): type(haste)
+def persistent_actions():
+    #log("Checking persistent actions")
+    #if equip_region.exists("paralysed.png",0): type(haste)
     #if equip_region.exists("food.png",0): type(food)
-    #while equip_region.exists("poison.png",0): type(exana_pox)
+    if equip_region.exists("poison.png",0): type(cure_poison)
     if (equip_ring == 1 and equip_region.exists("ring.png",0)): type(ring)
     if (equip_amulet == 1 and equip_region.exists("amulet.png",0)): type (amulet)
     else:return
 
-#DROP ITEMS TO GROUND
+#DROP ITEMS ON THE GROUND
 
 def drop_item_vial():
     log("Searching for vials to drop...")
@@ -576,46 +608,9 @@ def drop_item_to_sqm(sprite,name):
     
 #DEPOSIT ITEMS ON DEPOT
 
-#get match closest to mouse location
-def by_nearest(match):
-    refLocation = Env.getMouseLocation() 
-    x = math.fabs(match.getCenter().x - refLocation.x)
-    y = math.fabs(match.getCenter().y - refLocation.y)
-    distance = int(math.sqrt(x * x + y * y))
-    return distance
-
-def deposit_item(list_of_items):
-    try:
-        log("Walking to empty depot tile")
-        click(Pattern("depot0.png").similar(0.35))
-        wait(walk_interval)
-    except: 
-        log("Could not find an empty depot tile")
-        return
-    
-    if exists("depot1.png",0): dp_img = "depot1.png"
-    elif exists("depot2.png",0): dp_img = "depot2.png"
-    elif exists("depot3.png",0): dp_img = "depot3.png"
-    else: 
-        log("Could not find Locker")
-        return
-
-    hover(Location(x2,y2))    
-    sortedMatches = sorted(findAll(dp_img), key=by_nearest)
-    click(sortedMatches[0])
-    try:
-        wait("depot4.png")
-        click("depot4.png")
-        log("Depositing items...")
-        for item in list_of_items: 
-            try:
-                while exists(item): dragDrop(find(item),"depot5.png")
-            except: continue
-        log("... Items deposited")
-        
-    except: 
-        log("ERROR: Could not deposit one or more items")
-        return
+def deposit_item(container,list_of_items):
+    log("Under construction")
+    return
 
 #TALK TO NPC AND BUY ITEMS ON TRADE
 
@@ -675,22 +670,33 @@ def dust_creature_corpse(list_of_corpses):
 
 #SCRIPT SELECTION
 
-def script_selector_function():
-    script_list = (
-            "-nothing selected-",
-            "Rook Mino Hell"
-    )
-    
-    prompt = select("Please select a script from the list","Available Scripts", options = script_list, default = script_list[0])
+##The code snippet below should be easier for user to handle
+##and also removes hard code, but first must be 
+##evaluated if increases initialization time
 
-    global selected_script
+#script_dict = {}
+#script_file = open("/Users/GabrielMargonato/Downloads/SIKULI/BOT.sikuli/available_scripts.txt")
+#for line in script_file:
+#    key,value = line.rstrip('\n').split(":")
+#    script_dict[key] = value
+
+def script_selector_function():
+    script_dict = {
+        "Rook Mino Hell + Bear Room"    :"mino_hell",
+        "Kazordoon Drillworms Left"     :"kazz_drillworm"    
+    }
     
-    if   prompt == script_list[1]:  selected_script = "mino_hell"
-    else:
-        popup("The selected script is not valid!")
-        closeFrame(0)
-        raise Exception("Invalid Script")
-       
+    list_keys = []
+    for key,value in script_dict.items():
+        list_keys.append(key)
+
+    user_selection = select("Please select a script from the list",
+            "Available Scripts", 
+            options = list_keys, 
+            default = list_keys[0])
+
+    global selected_script   
+    selected_script = script_dict[user_selection]
     log("Selected Script: "+selected_script)
 
     global imported_script
@@ -715,7 +721,8 @@ def script_selector_function():
     global leave_conditions
     
     #imports the script that will be executed on this session
-    imported_script = importlib.import_module(selected_script)
+    try: imported_script = importlib.import_module(selected_script)
+    except: raise Exception("Could not find script folder")
     
     vocation      = imported_script.vocation
     loot_type     = imported_script.loot_type 
@@ -744,81 +751,102 @@ def script_selector_function():
     #if targetings list exists:
     if targeting: atk_parser(targeting)
 
+heal_dict = {
+    "exura ico":        ["heal_spell",1],
+    "exura gran ico":   ["heal_spell",600],
+    "exura med ico":    ["heal_spell",1],
+    "exura infir ico":  ["heal_spell",1],
+    "utura":            ["heal_spell",60],
+    "utura gran":       ["heal_spell",60],
+}
+        
 def heal_parser(healing):
+    #  0    1      2     3    4   5   6
     #[type,name,percent,htk|group,cd,LTU]
     for heal in healing:
-        #heal spells
-        if heal[1] == "exura ico":          heal.append("heal_spell"); heal.append(1);    heal.append(datetime.now())
-        elif heal[1] == "exura gran ico":   heal.append("heal_spell"); heal.append(600);  heal.append(datetime.now())
-        elif heal[1] == "exura med ico":    heal.append("heal_spell"); heal.append(1);    heal.append(datetime.now())
-        elif heal[1] == "exura infir ico":  heal.append("heal_spell"); heal.append(1);    heal.append(datetime.now())
-        elif "utura" in heal[1]:            heal.append("heal_spell"); heal.append(60);   heal.append(datetime.now()) 
-        elif "potion" in heal[1]:           heal.append("obj");        heal.append(1);    heal.append(datetime.now())
-        else: popup("ERROR: "+str(heal[1])+" not identified")
+        if ("potion" in heal[1]) or ("rune" in heal[1]):           
+            heal.append("obj")
+            if "potion" in heal[1]: heal.append(1)
+            else: heal.append(2)
+            heal.append(datetime.now())
+        else:
+            dict_aux = heal_dict[heal[1]]
+            heal.append(dict_aux[0])
+            heal.append(dict_aux[1])
+            heal.append(datetime.now())
     print "Healing parsed"
     
+atk_spells_dict = {
+    "exori":            ["atk_spell",4],
+    "exori gran":       ["atk_spell",6],
+    "exori gran ico":   ["atk_spell",30],
+    "exori hur":        ["atk_spell",6],
+    "exori ico":        ["atk_spell",6],
+    "exori mas":        ["atk_spell",8],
+    "exori min":        ["atk_spell",6],
+    "exeta res":        ["atk_spell",2],
+    "exeta amp res":    ["atk_spell",2]
+}    
+    
 def atk_parser(targeting):
+    #  0    1      2         3    4  5
     #[name,htk,min_targets|group,cd,LTU]
     for atk in targeting:
-        #knight spells
-        if atk[0] == "exori":            atk.append("atk_spell"); atk.append(4);  atk.append(datetime.now())
-        elif atk[0] == "exori gran":     atk.append("atk_spell"); atk.append(6);  atk.append(datetime.now())
-        elif atk[0] == "exori gran ico": atk.append("atk_spell"); atk.append(30); atk.append(datetime.now())
-        elif atk[0] == "exori hur":      atk.append("atk_spell"); atk.append(6);  atk.append(datetime.now())
-        elif atk[0] == "exori ico":      atk.append("atk_spell"); atk.append(6);  atk.append(datetime.now())
-        elif atk[0] == "exori mas":      atk.append("atk_spell"); atk.append(8);  atk.append(datetime.now())
-        elif atk[0] == "exori min":      atk.append("atk_spell"); atk.append(6);  atk.append(datetime.now())
-        elif "exeta" in atk[0]:          atk.append("atk_spell"); atk.append(2);  atk.append(datetime.now())
-        elif "rune" in atk[0]:           atk.append("obj");       atk.append(2);  atk.append(datetime.now())
-        else: popup("ERROR: "+str(atk[0])+" not identified")
+        if "rune" in atk[0]:
+            atk.append("obj")
+            atk.append(2)
+            atk.append(datetime.now())
+        else:
+            dict_aux = atk_spells_dict[atk[0]]
+            atk.append(dict_aux[0])
+            atk.append(dict_aux[1])
+            atk.append(datetime.now())
     print "Targeting parsed"  
         
-#CONSOLE WINDOW/FRAME
+#CONSOLE
+def createConsole():
+    global frame_x
+    global frame_y
+    try:
+        localchat = find("local_chat.png")
+        frame_x = (localchat.getX()) - 22 
+        frame_y = (localchat.getY()) + 22
+    except: 
+        frame_x = 0
+        frame_y = 43
+    if console_type == "complex": complex_console()
+    else: simple_console()
 
-try: 
-    localchat = find("local_chat.png")
-    frame_x = (localchat.getX()) - 22 
-    frame_y = (localchat.getY()) + 22
-except: 
-    frame_x = 0
-    frame_y = 43
-
-#receives a message and print it into jframe
-def log(message):
-    if console == "simple":
-        messageLOG.setText(str(datetime.now().strftime(" %H:%M:%S.%f")[:-4])+" - "+str(message)+"\n")
-    else:
-        if textArea.getLineCount() <= 500:
-            textArea.append(str(datetime.now().strftime("%H:%M:%S.%f")[:-4])+" - "+str(message)+"\n")
-            textArea.setCaretPosition(textArea.getDocument().getLength())
-        else: textArea.setText("Reseting console log (more than 500 lines) \n")
-        
-def closeFrame(event):
+def pauseExecution(event):
     global running
     running = 0
     quitButton.setEnabled(False)
-    if console != "complex": frame.dispose()
+    #quitButton.setText("PLAY")
+    #quitButton.setForeground(Color.GREEN)
+    if console_type != "complex": frame.dispose()
 
-#Complex frame
+#Complex
 def complex_console():
     global frame
-    #generates frame
-    frame = JFrame("[BETA] Game Master\'s Bot - Console Log")
-    frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE)
-    frame.setResizable(False)
-    frame.setAlwaysOnTop(True)
-    #frame.setBounds(8,545,600,130)
+    
+    #structure
+    frame = JFrame("[BETA] Game Master\'s Bot - Console")
     frame.setBounds(frame_x,frame_y,600,130)
     frame.contentPane.layout = FlowLayout()
     
-    #add QUIT button
+    #behavior
+    frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE)
+    frame.setResizable(False)
+    frame.setAlwaysOnTop(True)
+    
+    #Buttons
     global quitButton
-    quitButton = JButton("STOP", actionPerformed = closeFrame)
+    quitButton = JButton("STOP", actionPerformed = pauseExecution)
     quitButton.setForeground(Color.RED)
     quitButton.setPreferredSize(Dimension(100,100))
     frame.contentPane.add(quitButton)
     
-    #add text message
+    #Text
     global textArea
     textArea = JTextArea(6,38)
     textArea.setEditable(False)
@@ -826,45 +854,55 @@ def complex_console():
     scrollPane = JScrollPane(textArea, JScrollPane.VERTICAL_SCROLLBAR_ALWAYS, JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED)
     frame.contentPane.add(scrollPane)
     
-    #show frame
+    #Show
     frame.pack()
     frame.setVisible(True)
-    log("Welcome to Game Master\'s Bot!")
 
-#Simple frame
+#Simple
 def simple_console():
     global frame
-    frame = JFrame("[BETA] GameMaster Bot - Log")
-    frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE)
-    frame.setBounds(frame_x,frame_y,560,30)
     
+    #structure
+    frame = JFrame("[BETA] GameMaster Bot - Console")
+    frame.setBounds(frame_x,frame_y,560,50)
+    
+    #behavior
+    frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE)
+    #frame.setUndecorated(True)
+    frame.setAlwaysOnTop(True)
+
+    #text
     global messageLOG
     messageLOG = JLabel("")
     frame.add(messageLOG,BorderLayout.CENTER)
     
+    #Button
     global quitButton
-    quitButton = JButton("QUIT", actionPerformed =closeFrame)
+    quitButton = JButton("STOP", actionPerformed = pauseExecution)
     quitButton.setForeground(Color.RED)
     frame.add(quitButton,BorderLayout.WEST)
-    frame.setUndecorated(True)
-    frame.setAlwaysOnTop(True)
+
+    #Show
     frame.setVisible(True)
-    log("Welcome to GameMaster\'s Bot!")
 
-if console == "simple": simple_console()
-else: complex_console()
+#receives a message and print it
+def log(message):
+    if console_type == "simple":
+        messageLOG.setText(str(datetime.now().strftime(" %H:%M:%S.%f")[:-4])+" - "+str(message)+"\n")
+    else:
+        if textArea.getLineCount() <= 500:
+            textArea.append(str(datetime.now().strftime("%H:%M:%S.%f")[:-4])+" - "+str(message)+"\n")
+            textArea.setCaretPosition(textArea.getDocument().getLength())
+        else: textArea.setText("Reseting console log (more than 500 lines) \n")
 
-##############################################
- ######  ########    ###    ########  ######## 
-##    ##    ##      ## ##   ##     ##    ##    
-##          ##     ##   ##  ##     ##    ##    
- ######     ##    ##     ## ########     ##    
-      ##    ##    ######### ##   ##      ##    
-##    ##    ##    ##     ## ##    ##     ##    
- ######     ##    ##     ## ##     ##    ##    
-##############################################
+console_type = "complex" 
+createConsole()
+log("Welcome to GameMaster\'s Bot!")
 
-#execution starts here after hitting play/run
+#START OF EXECUTION
+game_region.highlight(0.5)
+
+#sets running variable to 1
 running = 0
 
 #1) Asks user which script will be executed
@@ -889,17 +927,19 @@ wp = int(wp_str)
 
 #4) generates an ID for this session
 session_id = str(datetime.now().strftime("%d%m%Y%H%M"))
-#log("Session ID: "+str(session_id))
+log("Session ID: "+str(session_id))
 log("Starting at "+label+" waypoint "+str(wp))
 #log("[ATTENTION] Walk interval is set to "+str(walk_interval)+" seconds")
 
 #5) focus on tibia client and shows ping on game screen
 App.focus("Tibia")
 clientPID = App("Tibia").getPID()
+print "Client Process ID:",clientPID
+
+#show ping on screen
 if not exists(Pattern("ping.png").similar(0.50),0): type(Key.F8, KeyModifier.ALT)
 
 #6) Calculates regions based on game screen elements    
-
 #GAME REGION INFORMATIONS
 #center
 gr_center_x = game_region.getCenter().getX()
@@ -984,7 +1024,7 @@ while running == 1:
     encounter = -1
     if label == "hunt": 
         if lure_mode == 1: check_battle_list()
-        check_debuffs()
+        persistent_actions()
         
     waypointer()
 
@@ -992,4 +1032,3 @@ while running == 1:
 
 else: 
     popup("END")
-    #if console == "simple": closeFrame(0)
