@@ -49,7 +49,7 @@ cure_poison = "i"
 haste       = "b"
 
 #defines game region
-game_region = Region(224,122,481,355)
+game_region = Region(189,121,549,407)
 
 #PIXEL ANALYZER
 
@@ -199,22 +199,6 @@ def checkMachineTime(interval_1,interval_2):
         return "leave"
     else:
         return "hunt"        
-
-# x1,y1 | x2,y1 | x3,y1
-# x1,y2 | x2,y2 | x3,y2
-# x1,y3 | x2,y3 | x3,y3
-
-pos_dict = {
-    "NW": Location(x1,y1),
-    "N":  Location(x2,y1),
-    "NE": Location(x3,y1),
-    "W":  Location(x1,y2),
-    "C":  Location(x2,y2),
-    "E":  Location(x3,y2),
-    "SW": Location(x1,y3),
-    "S":  Location(x2,y3),
-    "SE": Location(x3,y3)
-}
 
 def useAt(param1,param2):
     #use_item: click on a position on screen. Best used with doors
@@ -622,7 +606,7 @@ def dropItemToSQM(sprite,name):
 def depositItem(container,list_of_items):
     log("Under construction")
     #1) FIND EMPTY FLOOR
-    #2) FIND THE DEPOT CONTAINER (N, S, W, E)
+    #2) FIND LOCKER (N, S, W, E)
     #3) CLICK IT
     #4) DEPOSIT ITEMS ACCORDINGLY TO USER SPECIFICATIONS
     return
@@ -975,20 +959,31 @@ gr_blc_y = game_region.getBottomLeft().getY()
 gr_brc_x = game_region.getBottomRight().getX()
 gr_brc_y = game_region.getBottomRight().getY()
 
-screen_proportion = gr_brc_y/gr_trc_y
-scp_perc = 10
+multiplier = (gr_center_y - gr_tlc_y) / 5
 
-# x1y1 , x2y1 , x3y1
-# x1y2 , x2y2 , x3y2
-# x1y3 , x2y3 , x3y3
+# x1,y1 | x2,y1 | x3,y1
+# x1,y2 | x2,y2 | x3,y2
+# x1,y3 | x2,y3 | x3,y3
 
-x1 = gr_center_x - (screen_proportion*scp_perc)
+x1 = gr_center_x - multiplier
 x2 = gr_center_x
-x3 = gr_center_x + (screen_proportion*scp_perc)
+x3 = gr_center_x + multiplier
 
-y1 = gr_center_y - (screen_proportion*scp_perc)
+y1 = gr_center_y - multiplier
 y2 = gr_center_y
-y3 = gr_center_y + (screen_proportion*scp_perc)
+y3 = gr_center_y + multiplier
+
+pos_dict = {
+    "NW": Location(x1,y1),
+    "N":  Location(x2,y1),
+    "NE": Location(x3,y1),
+    "W":  Location(x1,y2),
+    "C":  Location(x2,y2),
+    "E":  Location(x3,y2),
+    "SW": Location(x1,y3),
+    "S":  Location(x2,y3),
+    "SE": Location(x3,y3)
+}
 
 #Battle list region
 try: battlelist = find(Pattern("battlelist.png").similar(0.75))
@@ -1045,4 +1040,5 @@ while running == 1:
     #gc.collect()
 
 else: 
-    popup("END")
+    #popup("END")
+    log("END")
