@@ -49,7 +49,7 @@ cure_poison = "i"
 haste       = "b"
 
 #defines game region
-game_region = Region(189,121,549,407)
+game_region = Region(222,122,481,350)
 
 #PIXEL ANALYZER
 
@@ -93,18 +93,16 @@ def logoffFunction():
 
 #WAYPOINT
 
-current_zoom = -1
-
 #this method controls the entire waypoint system
 def waypointManager():
 
     global wp
     global label
     
-    if label == "go_hunt":  wpList = imported_script.label_go_hunt[wp]
-    if label == "hunt":     wpList = imported_script.label_hunt[wp]
-    if label == "leave":    wpList = imported_script.label_leave[wp]
-    if label == "go_refil": wpList = imported_script.label_go_refil[wp]
+    if label == "go_hunt":  wpList = imported_script.label_go_hunt[wp-1]
+    if label == "hunt":     wpList = imported_script.label_hunt[wp-1]
+    if label == "leave":    wpList = imported_script.label_leave[wp-1]
+    if label == "go_refil": wpList = imported_script.label_go_refil[wp-1]
     
     #list of possible inputs for the waypoint
     if   wpList[0] == "walk" and running == 1: walkToNextWaypoint(wpList)
@@ -120,7 +118,6 @@ def waypointManager():
         try: buyItem(wpList[1],wpList[2])
         except: raise Exception("Could not find trade window")
     elif wpList[0] == "reset": resetRun()
-    elif wpList[0] == "pass": pass
     elif wpList[0] == "use_item": 
         try: click(wpList[1])
         except: log("Item not found")
@@ -137,7 +134,7 @@ def waypointManager():
     elif label == "hunt" and wp >= last_hunt_wp:
         if drop_vials > 0 and running == 1: 
             checkBattleList()
-            dropItemVial()
+            dropVials()
         
         log("Checking conditions to leave hunt...")
         for condition in leave_conditions:
@@ -212,37 +209,48 @@ def useAt(param1,param2):
             click(param1)
             click(pos_dict[param2.upper()])
     except: log("Invalid position. See documentation for examples.")
+
+
+current_zoom = -1
         
 def walkToNextWaypoint(wpList):
-#wpList = [0:action, 1:img ,2:zoom, 3:atk]   
 
-    global current_zoom
+    #wpList = [action,(img,zoom),atk]
+
+    #The structure consists of 'walk' as action, 
+    #followed by a tuple (minimap pattern and number of zoom), 
+    #and lastly if it should keep an eye out for monsters, represented 
+    #by 0 (in this case the bot will just walk/not attack), or 1+ (in this case
+    #the bot will engange combat only if the number of monsters on battle list
+    #is equal or higher than the especified)
     
-    if wpList[2] != current_zoom: 
-        
+    global current_zoom
+
+    #returns the second value of the tuple (zoom)
+    if wpList[1][1] != current_zoom: 
+
         for i in range(0,3):
             click(Location(sub_zoom.getX(),sub_zoom.getY()))
     
-        for i in range(0,wpList[2]):
+        for i in range(0,wpList[1][1]):
             click(Location(add_zoom.getX(),add_zoom.getY()))
     
         #update current_zoom to new value
-        current_zoom = wpList[2]
+        current_zoom = wpList[1][1]
         
     else: pass
 
-    log("Walking to "+label+" waypoint "+str(wp))
     try:
-        
-        #click the match on screen
-        click(wpList[1])
+        log("Walking to "+label+" waypoint "+str(wp))
+        #return the first value of the tuple (pattern)
+        click(wpList[1][0])
         hover(Location(x2,y2))
 
         #if there is no way to the destination, 
         #its possible that the character is trapped 
         #in this case, force an attack
         if check_no_way == 1:
-            if game_region.exists(Pattern("thereisnoway.png").exact(),0.5):
+            if game_region.exists(Pattern("thereisnoway.png").exact(),0.5) and running == 1:
                 log("unreachable destination, possibly trapped")
                 type(Key.SPACE)
                 wait(0.3)
@@ -262,7 +270,6 @@ def walkToNextWaypoint(wpList):
     return
     
 def checkIsWalking(wpList):
-#wpList = [0:action, 1:img, 2:zoom, 3:atk]
 
     global encounter
     time_stopped = 0
@@ -284,8 +291,8 @@ def checkIsWalking(wpList):
             #while is walking and paralysed, use haste
             #if equip_region.exists("paralysed.png",0): type(haste)
                      
-            if wpList[3] > 0: 
-                if (not game_region.exists(Pattern("thereisnoway.png").exact(),0)) and (countTargets(wpList[3]) >= wpList[3]): 
+            if wpList[2] > 0: 
+                if (not game_region.exists(Pattern("thereisnoway.png").exact(),0)) and (countTargets(wpList[2]) >= wpList[2]): 
                     type(Key.ESC)
                     wait(0.3)
                     checkBattleList()
@@ -333,7 +340,7 @@ def resetRun():
     for condition in leave_conditions:
         index = (leave_conditions.index(condition)) + 1
         next_label = checkLeaveConditions(condition[0],condition[1])
-        if next_label == "leave": break #if a leave condition is found, shoul not check for another
+        if next_label == "leave": break #if a condition is found, it must not check for another
 
     if next_label == "hunt":
         log("Restarting hunt from the beginning")
@@ -378,10 +385,10 @@ def checkBattleList():
     elif running == 0: return    
     else: 
         log("Battle list is clear")
-        if drop_vials == 2: dropItemVial()
+        if drop_vials == 2: dropVials()
         if encounter == 1 and loot_type == 3: lootAround(1)
         if dust_skin == 1 and label == "hunt":
-            try: skinCreatureCorpse(imported_script.corpses)
+            try: skinCreatureCorpse(imported_script.corpses) #list of corpse images
             except: pass
         return
 
@@ -407,7 +414,7 @@ def countTargets(slots):
 #loot_type = 3 -> loot only after clearing the battle list
 
 def lootAround(times):
-    log("Looting around char ("+str(times)+"x)")
+    log("Looting around ("+str(times)+"x)")
     for i in range(times):
         #parameter '8' equals to 'alt + left click'
         click(pos_dict["NW"],8)
@@ -575,24 +582,24 @@ def persistentActions():
 
 #DROP ITEMS ON THE GROUND
 
-def dropItemVial():
-    log("Searching for vials to drop...")
+def dropVials():
+    log("Searching for empty vials")
     try:
-        dropItemToSQM(Pattern("small_flask.png").exact(),"small empty flask")
-        dropItemToSQM(Pattern("strong_flask.png").exact(),"strong empty flask")
-        dropItemToSQM(Pattern("great_flask.png").exact(),"great empty flask")
+        dropItemToFeet(Pattern("small_flask.png").exact(),"small empty flask")
+        dropItemToFeet(Pattern("strong_flask.png").exact(),"strong empty flask")
+        dropItemToFeet(Pattern("great_flask.png").exact(),"great empty flask")
     except: log("ERROR dropping vials")
 
-def dropItem(wpList):
+def dropListOfItems(wpList):
     checkBattleList()
     try:
         for index,tuple in enumerate(wpList[1]):
             sprite = tuple[0]
             name   = tuple[1]
-            if exists(sprite,0): dropItemToSQM(sprite,name)
+            if exists(sprite,0): dropItemToFeet(sprite,name)
     except: print "ERROR droping items"
 
-def dropItemToSQM(sprite,name):
+def dropItemToFeet(sprite,name):
     if exists(sprite,0):
         imageCount = len(list([x for x in findAll(sprite)]))
         for i in range(imageCount):
@@ -1039,6 +1046,4 @@ while running == 1:
 
     #gc.collect()
 
-else: 
-    #popup("END")
-    log("END")
+else: log("END -")
