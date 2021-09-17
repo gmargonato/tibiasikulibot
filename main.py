@@ -18,7 +18,7 @@ from java.awt import BorderLayout,GridLayout,GridBagConstraints,GridBagLayout,Fl
 from sikuli import *
 
 #basic settings
-Settings.ObserveScanRate = 2
+Settings.ObserveScanRate = 5
 Settings.MoveMouseDelay = 0
 Settings.ActionLogs = 0
 Settings.InfoLogs = 0
@@ -35,37 +35,31 @@ walk_interval = 2
 #check if there is no way to the mob
 check_no_way = 1
 
-#tools
-rope   = "o"  
-shovel = "p"
-ring   = "l"
-amulet = "k"
-food   = "u"
-dust   = "="
+#tools and spells
+rope_key   = "o"  
+shovel_key = "p"
+ring_key   = "l"
+amulet_key = "k"
+food_key   = "u"
+dust_key   = "="
+poison_key = "i"
+haste_key  = "b"
 
-#spells
-cure_poison = "i"
-haste       = "b"
-
-#defines game region
+#user must remember to setup manually the game region
 game_region = Region(222,122,481,350)
 
 #image references
-#icons
 in_combat_icon = "battleon.png"
 paralyse_icon = "paralysed.png"
 food_icon = "food.png"
 poison_icon = "poison.png"
 ping_icon = Pattern("ping.png").similar(0.50)
-
 battle_target_icon = "bl_target.png"
-#texts
 local_chat_text = "local_chat.png"
 there_is_no_way_text = Pattern("thereisnoway.png").exact()
 battle_list_text = Pattern("battlelist.png").similar(0.75)
 valuable_loot_text = Pattern("valuable_loot.png").similar(0.90)
 no_mana_text = Pattern("noenoughmana.png").similar(0.90)
-#images
 life_mana_img = Pattern("life_mana_bars.png").exact()
 add_zoom_img = Pattern("add_zoom.png").exact()
 sub_zoom_img = Pattern("sub_zoom.png").exact()
@@ -73,10 +67,12 @@ minimap_ref_img = "minimap_aux.png"
 store_purse_img = "store_inbox.png"
 no_ring_img = "ring.png"
 no_amulet_img = "amulet.png"
+gold_converter_img = "gold_converter_img.png"
+stack_of_100_gold_img = Pattern("stack_of_100_gold_img.png").exact()
 
 #PIXEL ANALYZER
 
-def getPixelColorForAll(posX,posY):   
+def getPixelColorGeneric(posX,posY):   
     pixel = Robot().getPixelColor(posX,posY)
     r = pixel.getRed()
     g = pixel.getGreen() 
@@ -84,7 +80,7 @@ def getPixelColorForAll(posX,posY):
     color = '{:02x}{:02x}{:02x}'.format(r,g,b)
     return color
 
-def getPixelColorForHealer(posX,posY,id):
+def getPixelColorHealer(posX,posY,id):
 
     pixel = Robot().getPixelColor(posX,posY)
     if   id == "life": return pixel.getRed()
@@ -130,25 +126,29 @@ def waypointManager():
     #list of possible inputs for the waypoint
     if   wpList[0] == "walk" and running == 1: walkToNextWaypoint(wpList)
     elif wpList[0] in ("rope","ladder","shovel"): waypointSpecialAction(wpList[0])
-    elif wpList[0] == "drop": dropItem(wpList)
     elif wpList[0] == "talk": talkToNPC(wpList)
     elif wpList[0] == "attack": checkBattleList()
     elif wpList[0] == "deposit": depositItem(wpList[1],wpList[2])
+    elif wpList[0] == "reset": resetRun()
+    elif wpList[0] == "use_at": useAt(wpList[1],0)
+    elif wpList[0] == "use_item_at": useAt(wpList[1],wpList[2])
+        
     elif wpList[0] == "go_refil": 
         label = "go_refil"
         wp = 0
+        
     elif wpList[0] == "refil": 
         try: buyItem(wpList[1],wpList[2])
         except: raise Exception("Could not find trade window")
-    elif wpList[0] == "reset": resetRun()
+    
     elif wpList[0] == "use_item": 
         try: click(wpList[1])
         except: log("Item not found")
-    elif wpList[0] == "use_at": useAt(wpList[1],0)
-    elif wpList[0] == "use_item_at": useAt(wpList[1],wpList[2])
+    
+    #in case input not recognized
     else: log("WARNING: error on waypoint"+str(wp)+":"+wpList[0])
        
-    #Arrived at waypoint
+    ##Arrived at waypoint##
     if label == "go_hunt" and wp >= last_go_hunt_wp:
         log("Setting label to hunt")
         label = "hunt"
@@ -210,7 +210,6 @@ def checkLeaveConditions(name,param):
             log("Error: Could not use parameter as pattern")
             return "leave"
 
-#check current machine time
 def checkMachineTime(interval_1,interval_2):
 
     current_time = datetime.now().strftime("%H:%M") 
@@ -235,13 +234,12 @@ def useAt(param1,param2):
 
 
 current_zoom = -1
-        
 def walkToNextWaypoint(wpList):
 
     #wpList = [action,(img,zoom),atk]
 
     #The structure consists of 'walk' as action, 
-    #followed by a tuple (minimap pattern and number of zoom), 
+    #followed by a tuple (minimap pattern and number of minimap's zoom), 
     #and lastly if it should keep an eye out for monsters, represented 
     #by 0 (in this case the bot will just walk/not attack), or 1+ (in this case
     #the bot will engange combat only if the number of monsters on battle list
@@ -273,7 +271,7 @@ def walkToNextWaypoint(wpList):
         #its possible that the character is trapped 
         #in this case, force an attack
         if check_no_way == 1:
-            if game_region.exists(there_is_no_way_text,0.5) and running == 1:
+            if running == 1 and game_region.exists(there_is_no_way_text,0.5):
                 log("unreachable destination, possibly trapped")
                 type(Key.SPACE)
                 wait(0.3)
@@ -282,8 +280,8 @@ def walkToNextWaypoint(wpList):
             else: pass
 
         #check if should cast haste spell
-        if not use_haste: pass
-        elif label in use_haste: type(haste)
+        if cast_haste == []: pass
+        elif label in cast_haste: type(haste)
         else: pass
 
         #check if the character is moving or not
@@ -315,7 +313,8 @@ def checkIsWalking(wpList):
             #if equip_region.exists(paralyse_icon,0): type(haste)
                      
             if wpList[2] > 0: 
-                if (not game_region.exists(there_is_no_way_text,0)) and (countTargets(wpList[2]) >= wpList[2]): 
+                #if (not game_region.exists(there_is_no_way_text,0)) and (countTargets(wpList[2]) >= wpList[2]): 
+                if countTargets(wpList[2]) >= wpList[2]:
                     type(Key.ESC)
                     wait(0.3)
                     checkBattleList()
@@ -340,7 +339,7 @@ def miniMapChangeHandler(event):
 
 def waypointSpecialAction(action): 
     if action == "rope":
-        type(rope)
+        type(rope_key)
         click(Location(gr_center_x,gr_center_y))
         log("Using rope")
         
@@ -349,7 +348,7 @@ def waypointSpecialAction(action):
         log("Using ladder")
         
     if action == "shovel":
-        type(shovel)
+        type(shovel_key)
         click(Location(gr_center_x,gr_center_y))
         log("Using shovel")    
 
@@ -363,7 +362,7 @@ def resetRun():
     for condition in leave_conditions:
         index = (leave_conditions.index(condition)) + 1
         next_label = checkLeaveConditions(condition[0],condition[1])
-        if next_label == "leave": break #if a condition is found, it must not check for another
+        if next_label == "leave": break #if a condition is found, it must exit right away
 
     if next_label == "hunt":
         log("Restarting hunt from the beginning")
@@ -381,7 +380,7 @@ def checkBattleList():
     global in_battle
     in_battle = 0
 
-    if running == 1 and getPixelColorForAll(bl_slot1_x,bl_slot1_y) == "000000": 
+    if running == 1 and getPixelColorGeneric(bl_slot1_x,bl_slot1_y) == "000000": 
    
         log("Attacking mob...")
         type(Key.SPACE)
@@ -400,7 +399,7 @@ def checkBattleList():
         in_battle = 1
         battlelist_region.waitVanish(battle_target_icon,30)
         in_battle = 0
-        #loot system
+        #loot system (documentation below)
         if loot_type == 1 and label == "hunt": lootAround(1)
         if loot_type == 2 and game_region.exists(valuable_loot_text,0): lootAround(2)
         checkBattleList()
@@ -410,8 +409,8 @@ def checkBattleList():
         log("Battle list is clear")
         if drop_vials == 2: dropVials()
         if encounter == 1 and loot_type == 3: lootAround(1)
-        if dust_skin == 1 and label == "hunt":
-            try: skinCreatureCorpse(imported_script.corpses) #list of corpse images
+        if dust_skin != [] and label == "hunt":
+            try: skinCreatureCorpse() #list of corpse images
             except: pass
         return
 
@@ -424,7 +423,7 @@ def countTargets(slots):
     #cycle trought battle list slots
     for i in range(slots):
         #log("\t"+"slot "+str((i+1))+"/"+str(slots))
-        if getPixelColorForAll(bl_slot1_x,slot) == "000000": num_targets+=1
+        if getPixelColorGeneric(bl_slot1_x,slot) == "000000": num_targets+=1
         slot += 22
 
     return num_targets
@@ -522,7 +521,7 @@ def lifeTest(percent):
     life_y = life_mana_bars.getCenter().getY()-7
  
     test_x = (start_life_x + int((float(percent)/100) * (end_life_x - start_life_x)))   
-    red = getPixelColorForHealer(test_x,life_y,"life")
+    red = getPixelColorHealer(test_x,life_y,"life")
         
     if red >= 200:
         return 0
@@ -536,7 +535,7 @@ def manaTest(percent):
     mana_y = life_mana_bars.getCenter().getY()+6
     
     test_x = (start_mana_x + int((float(percent)/100) * (end_mana_x - start_mana_x)))    
-    blue = getPixelColorForHealer(test_x,mana_y,"mana")
+    blue = getPixelColorHealer(test_x,mana_y,"mana")
     if blue >= 200:
         return 0
     else:
@@ -591,17 +590,38 @@ def startAttackingThread():
     else: 
         print "[ERROR] Attacking thread already running"
 
-#CHARACTER STATUS AND DEBUFFS
+#PERSISTENT ACTIONS ARE CHECKED EVERY TIME CHAR ARRIVES AT A WAYPOINT
 
 def persistentActions():
     log("Checking persistent actions")
-    #if equip_region.exists(paralyse_icon,0): type(haste)
-    #if equip_region.exists(food_icon,0): type(food)
-    #if equip_region.exists(poison_icon,0): type(cure_poison)
-    if (equip_ring == 1 and equip_region.exists(no_ring_img,0)): type(ring)
-    if (equip_amulet == 1 and equip_region.exists(no_amulet_img,0)): type (amulet)
-    else:return
+    if cast_haste == 1: 
+        if equip_region.exists(paralyse_icon,0):
+            type(haste_key)
+    if eat_food == 1:
+        if equip_region.exists(food_icon,0):
+            type(food_key)
+    if cure_poison == 1:
+        if equip_region.exists(poison_icon,0):  
+            type(poison_key)
+    if equip_ring == 1:
+        if equip_region.exists(no_ring_img,0):
+            type(ring_key)
+    if equip_amulet == 1:
+        if equip_region.exists(no_amulet_img,0):
+            type(amulet_key)
+    if drop_items != []: dropListOfItems()
+    if convert_gold == 1: convertGoldFunction()
 
+#CONVERT GOLD WITH ITEM "GOLD CONVERTER"
+#Store purse must be openned and "Gold Converter" must be visible
+def convertGoldFunction():
+    while exists(gold_converter_img,0) and exists(stack_of_100_gold_img):
+        click(gold_converter_img)
+        wait(1)
+        click(stack_of_100_gold_img)
+        log("100 gold converted to platinum sucessfully")
+    else: log("ERROR converting gold")
+        
 #DROP ITEMS ON THE GROUND
 
 def dropVials():
@@ -612,14 +632,14 @@ def dropVials():
         dropItemToFeet(Pattern("great_flask.png").exact(),"great empty flask")
     except: log("ERROR dropping vials")
 
-def dropListOfItems(wpList):
+def dropListOfItems():
     checkBattleList()
     try:
-        for index,tuple in enumerate(wpList[1]):
-            sprite = tuple[0]
-            name   = tuple[1]
+        for tuple in drop_items:
+            name   = tuple[0]                
+            sprite = tuple[1]
             if exists(sprite,0): dropItemToFeet(sprite,name)
-    except: print "ERROR droping items"
+    except: log("ERROR dropping items")
 
 def dropItemToFeet(sprite,name):
     if exists(sprite,0):
@@ -634,10 +654,9 @@ def dropItemToFeet(sprite,name):
 
 def depositItem(container,list_of_items):
     log("Under construction")
-    #1) FIND EMPTY FLOOR
-    #2) FIND LOCKER (N, S, W, E)
-    #3) CLICK IT
-    #4) DEPOSIT ITEMS ACCORDINGLY TO USER SPECIFICATIONS
+    #1) FIND LOCKER (N, S, W, E)
+    #2) CLICK IT
+    #3) DEPOSIT ITEMS ACCORDINGLY TO USER SPECIFICATIONS
     return
 
 #TALK TO NPC AND BUY ITEMS ON TRADE
@@ -672,7 +691,7 @@ def buyItem(item,qtd):
     
     #npc_trade_region.highlight(1)
     log("Browsing through npc items")
-    while not exists(item,0): npc_trade_region.click("npc2.png")
+    while not exists(item,0): npc_trade_region.click(Pattern("npc2.png").exact())
     else: npc_trade_region.click(item)
 
     qtd_bar_region = Region(
@@ -692,18 +711,18 @@ def buyItem(item,qtd):
     for i in range(hqtd): npc_trade_region.click("npc4.png")
 
 #DUST/SKIN CREATURE CORPSES
-def skinCreatureCorpse(list_of_corpses):
+def skinCreatureCorpse():
     log("Under construction")
-    #1) FIND CORPSE ON SCREEN
-    #2) CLICK IT WITH TOOL
-    #3) REPEAT IF THERE IS ANOTHER CORPSE
+    #1) FIND CORPSE ON SCREEN THAT MATCHES THE VARIABLE/LIST "dust_skin"
+    #2) CLICK IT WITH TOOL "dust_key"
+    #3) REPEAT IF THERE IS ANOTHER MATCH
     return
 
 #SCRIPT SELECTION
 
-##The code snippet below should be easier for user to handle
-##and also removes hard code, but first must be 
-##evaluated if increases initialization time
+#The code snippet below should be easier for user to handle
+#and also removes hard code, but first must be 
+#evaluated if increases initialization time
 
 #script_dict = {}
 #script_file = open("/Users/GabrielMargonato/Downloads/SIKULI/BOT.sikuli/available_scripts.txt")
@@ -730,57 +749,54 @@ def scriptSelector():
     selected_script = script_dict[user_selection]
     log("Selected Script: "+selected_script)
 
-    global imported_script
-    
-    global vocation      
-    global loot_type    
-    global lure_mode
-    global equip_ring    
-    global equip_amulet  
-    global drop_vials    
-    global dust_skin
-    global use_haste
-    
-    global healing
-    global targeting
-
-    global wp
-    global last_hunt_wp
-    global last_leave_wp
-    global last_go_hunt_wp
-
-    global leave_conditions
-    
     #imports the script that will be executed on this session
+    global imported_script
     imported_script = importlib.import_module(selected_script)
     
-    vocation      = imported_script.vocation
-    loot_type     = imported_script.loot_type 
-    lure_mode     = imported_script.lure_mode  
-    equip_ring    = imported_script.equip_ring
-    equip_amulet  = imported_script.equip_amulet
-    drop_vials    = imported_script.drop_vials
-    dust_skin     = imported_script.dust_skin
-    use_haste     = imported_script.use_haste
-
-    #waypoints
-    last_go_hunt_wp = len(imported_script.label_go_hunt)
-    last_hunt_wp    = len(imported_script.label_hunt)
-    last_leave_wp   = len(imported_script.label_leave)
-
-    #leave hunt conditions list
-    leave_conditions = imported_script.leave_conditions
-    
-    #imports healing list
+    #imports users healing list and parses it
+    global healing
     healing   = imported_script.healing
     #if healing list exists:
     if healing: userHealInputParser(healing)
-    
-    #imports targeting list
+        
+    #imports users targeting list and parses it
+    global targeting
     targeting = imported_script.targeting
     #if targetings list exists:
     if targeting: userAtkInputParser(targeting)
+        
+    #imports waypoints-related variables
+    global wp
+    
+    global last_go_hunt_wp
+    last_go_hunt_wp = len(imported_script.label_go_hunt)
+    
+    global last_hunt_wp
+    last_hunt_wp    = len(imported_script.label_hunt)
+    
+    global last_leave_wp
+    last_leave_wp   = len(imported_script.label_leave)
+    
+    global leave_conditions
+    leave_conditions = imported_script.leave_conditions
 
+    #initializes variables from configs dictionary, but if doesn't exist, set a default value
+    global vocation,lure_mode,loot_type,drop_items,drop_vials,equip_ring,equip_amulet,dust_skin,convert_gold,eat_food,anti_paralyse,cure_poison,cast_haste
+    configs = imported_script.configs
+    vocation        = configs.get("vocation",0)    
+    lure_mode       = configs.get("lure_mode",0)    
+    loot_type       = configs.get("loot_type",0)  
+    drop_items      = configs.get("drop_items",0)   
+    drop_vials      = configs.get("drop_vials",0)   
+    equip_ring      = configs.get("equip_ring",0) 
+    equip_amulet    = configs.get("equip_amulet",0) 
+    dust_skin       = configs.get("dust_skin",[])    
+    convert_gold    = configs.get("convert_gold",0)
+    eat_food        = configs.get("eat_food",0)     
+    anti_paralyse   = configs.get("anti_paralyse",0)
+    cure_poison     = configs.get("cure_poison",0)  
+    cast_haste      = configs.get("cast_haste",[])
+    
 heal_dict = {
     "exura ico":        ["heal_spell",1],
     "exura gran ico":   ["heal_spell",600],
@@ -844,8 +860,7 @@ def startConsole():
     except: 
         frame_x = 0
         frame_y = 43
-    if console_type == "complex": createComplexConsole()
-    else: createSimpleConsole()
+    createConsole()
 
 def pauseExecution(event):
     global running
@@ -856,11 +871,11 @@ def pauseExecution(event):
     if console_type != "complex": frame.dispose()
 
 #Complex
-def createComplexConsole():
+def createConsole():
     global frame
     
     #structure
-    frame = JFrame("[BETA] Game Master\'s Bot - Console")
+    frame = JFrame("[BETA] Game Master\'s Bot")
     frame.setBounds(frame_x,frame_y,600,130)
     frame.contentPane.layout = FlowLayout()
     
@@ -888,48 +903,18 @@ def createComplexConsole():
     frame.pack()
     frame.setVisible(True)
 
-#Simple
-def createSimpleConsole():
-    global frame
-    
-    #structure
-    frame = JFrame("[BETA] GameMaster Bot - Console")
-    frame.setBounds(frame_x,frame_y,560,50)
-    
-    #behavior
-    frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE)
-    #frame.setUndecorated(True)
-    frame.setAlwaysOnTop(True)
-
-    #text
-    global messageLOG
-    messageLOG = JLabel("")
-    frame.add(messageLOG,BorderLayout.CENTER)
-    
-    #Button
-    global quitButton
-    quitButton = JButton("STOP", actionPerformed = pauseExecution)
-    quitButton.setForeground(Color.RED)
-    frame.add(quitButton,BorderLayout.WEST)
-
-    #Show
-    frame.setVisible(True)
-
 #receives a message and print it
 def log(message):
-    if console_type == "simple":
-        messageLOG.setText(str(datetime.now().strftime(" %H:%M:%S.%f")[:-4])+" - "+str(message)+"\n")
-    else:
-        if textArea.getLineCount() <= 500:
-            textArea.append(str(datetime.now().strftime("%H:%M:%S.%f")[:-4])+" - "+str(message)+"\n")
-            textArea.setCaretPosition(textArea.getDocument().getLength())
-        else: textArea.setText("Reseting log (more than 500 lines) \n")
+    if textArea.getLineCount() <= 500:
+        textArea.append(str(datetime.now().strftime("%H:%M:%S.%f")[:-4])+" - "+str(message)+"\n")
+        textArea.setCaretPosition(textArea.getDocument().getLength())
+    else: textArea.setText("Reached 500 lines limit - Clearing log \n")
 
 startConsole()
 log("Welcome to GameMaster\'s Bot!")
 
 #START OF EXECUTION
-game_region.highlight(0.5,"green") #expendable step - just to show the user
+game_region.highlight(0.5,"green") #expendable step - just to remind the user
 
 #sets running variable to 1
 running = 0
@@ -1057,8 +1042,9 @@ startHealingThread()
 if vocation > 0: startAttackingThread()
 print " "
 
-if label == "hunt":
-    checkBattleList()
+#if starting at hunt, immediately check battle list
+encounter = -1
+if label == "hunt": checkBattleList()
 
 while running == 1:
 
@@ -1073,4 +1059,5 @@ while running == 1:
 
 else: 
     #popup("END")
+    quitButton.setEnabled(False)
     log("END - you may close this window now")
