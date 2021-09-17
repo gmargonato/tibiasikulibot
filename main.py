@@ -7,7 +7,6 @@ import subprocess
 import re
 import math
 import importlib
-import json
 import threading
 import shutil
 import potions
@@ -19,7 +18,7 @@ from java.awt import BorderLayout,GridLayout,GridBagConstraints,GridBagLayout,Fl
 from sikuli import *
 
 #basic settings
-Settings.ObserveScanRate = 10
+Settings.ObserveScanRate = 2
 Settings.MoveMouseDelay = 0
 Settings.ActionLogs = 0
 Settings.InfoLogs = 0
@@ -51,6 +50,30 @@ haste       = "b"
 #defines game region
 game_region = Region(222,122,481,350)
 
+#image references
+#icons
+in_combat_icon = "battleon.png"
+paralyse_icon = "paralysed.png"
+food_icon = "food.png"
+poison_icon = "poison.png"
+ping_icon = Pattern("ping.png").similar(0.50)
+
+battle_target_icon = "bl_target.png"
+#texts
+local_chat_text = "local_chat.png"
+there_is_no_way_text = Pattern("thereisnoway.png").exact()
+battle_list_text = Pattern("battlelist.png").similar(0.75)
+valuable_loot_text = Pattern("valuable_loot.png").similar(0.90)
+no_mana_text = Pattern("noenoughmana.png").similar(0.90)
+#images
+life_mana_img = Pattern("life_mana_bars.png").exact()
+add_zoom_img = Pattern("add_zoom.png").exact()
+sub_zoom_img = Pattern("sub_zoom.png").exact()
+minimap_ref_img = "minimap_aux.png"
+store_purse_img = "store_inbox.png"
+no_ring_img = "ring.png"
+no_amulet_img = "amulet.png"
+
 #PIXEL ANALYZER
 
 def getPixelColorForAll(posX,posY):   
@@ -72,7 +95,7 @@ def getPixelColorForHealer(posX,posY,id):
 
 def logoffFunction():
     
-    if equip_region.exists("battleon.png"):
+    if equip_region.exists(in_combat_icon):
         log("Could not logoff, waiting 10 seconds...")
         checkBattleList()
         wait(10)
@@ -250,11 +273,11 @@ def walkToNextWaypoint(wpList):
         #its possible that the character is trapped 
         #in this case, force an attack
         if check_no_way == 1:
-            if game_region.exists(Pattern("thereisnoway.png").exact(),0.5) and running == 1:
+            if game_region.exists(there_is_no_way_text,0.5) and running == 1:
                 log("unreachable destination, possibly trapped")
                 type(Key.SPACE)
                 wait(0.3)
-                battlelist_region.waitVanish("bl_target.png",5)
+                battlelist_region.waitVanish(battle_target_icon,5)
                 walkToNextWaypoint(wpList)
             else: pass
 
@@ -289,10 +312,10 @@ def checkIsWalking(wpList):
             time_stopped = 0
             
             #while is walking and paralysed, use haste
-            #if equip_region.exists("paralysed.png",0): type(haste)
+            #if equip_region.exists(paralyse_icon,0): type(haste)
                      
             if wpList[2] > 0: 
-                if (not game_region.exists(Pattern("thereisnoway.png").exact(),0)) and (countTargets(wpList[2]) >= wpList[2]): 
+                if (not game_region.exists(there_is_no_way_text,0)) and (countTargets(wpList[2]) >= wpList[2]): 
                     type(Key.ESC)
                     wait(0.3)
                     checkBattleList()
@@ -350,9 +373,8 @@ def resetRun():
         label = "leave"
         
 #BATTLE
-
 in_battle = 0
-        
+
 def checkBattleList():
 
     global encounter
@@ -368,7 +390,7 @@ def checkBattleList():
 
         #in case there is no way to the mob
         if check_no_way == 1: 
-            if game_region.exists(Pattern("thereisnoway.png").exact(),0):
+            if game_region.exists(there_is_no_way_text,0):
                 log("Unreachable creature")
                 type(Key.ESC)
                 if loot_type == 3: lootAround(1)
@@ -376,10 +398,11 @@ def checkBattleList():
 
         #flag in_battle is used to start/end casting spells
         in_battle = 1
-        battlelist_region.waitVanish("bl_target.png",30)    
+        battlelist_region.waitVanish(battle_target_icon,30)
         in_battle = 0
+        #loot system
         if loot_type == 1 and label == "hunt": lootAround(1)
-        if loot_type == 2 and game_region.exists(Pattern("valuable_loot.png").similar(0.90),0): lootAround(2)
+        if loot_type == 2 and game_region.exists(valuable_loot_text,0): lootAround(2)
         checkBattleList()
 
     elif running == 0: return    
@@ -536,10 +559,9 @@ def attackingThread(arg):
     
         for atk in targeting:
 
-            #if battlelist_region.exists("bl_target.png",0):
             if in_battle == 1:
     
-                if game_region.exists(Pattern("noenoughmana.png").similar(0.90),0):
+                if game_region.exists(no_mana_text,0):
                     log("Not enough mana to cast attack spell")
                     continue
 
@@ -573,11 +595,11 @@ def startAttackingThread():
 
 def persistentActions():
     log("Checking persistent actions")
-    #if equip_region.exists("paralysed.png",0): type(haste)
-    #if equip_region.exists("food.png",0): type(food)
-    #if equip_region.exists("poison.png",0): type(cure_poison)
-    if (equip_ring == 1 and equip_region.exists("ring.png",0)): type(ring)
-    if (equip_amulet == 1 and equip_region.exists("amulet.png",0)): type (amulet)
+    #if equip_region.exists(paralyse_icon,0): type(haste)
+    #if equip_region.exists(food_icon,0): type(food)
+    #if equip_region.exists(poison_icon,0): type(cure_poison)
+    if (equip_ring == 1 and equip_region.exists(no_ring_img,0)): type(ring)
+    if (equip_amulet == 1 and equip_region.exists(no_amulet_img,0)): type (amulet)
     else:return
 
 #DROP ITEMS ON THE GROUND
@@ -816,7 +838,7 @@ def startConsole():
     global frame_x
     global frame_y
     try:
-        localchat = find("local_chat.png")
+        localchat = find(local_chat_text)
         frame_x = (localchat.getX()) - 22 
         frame_y = (localchat.getY()) + 22
     except: 
@@ -907,7 +929,7 @@ startConsole()
 log("Welcome to GameMaster\'s Bot!")
 
 #START OF EXECUTION
-game_region.highlight(0.5) #expendable step - just to show the user
+game_region.highlight(0.5,"green") #expendable step - just to show the user
 
 #sets running variable to 1
 running = 0
@@ -942,7 +964,7 @@ log("Starting at "+label+" waypoint "+str(wp))
 App.focus("Tibia")
 
 #show ping on screen
-if not exists(Pattern("ping.png").similar(0.50),0): type(Key.F8, KeyModifier.ALT)
+if not exists(ping_icon,0): type(Key.F8, KeyModifier.ALT)
 
 #6) Calculates regions based on game screen elements    
 #GAME REGION INFORMATIONS
@@ -993,7 +1015,7 @@ pos_dict = {
 }
 
 #Battle list region
-try: battlelist = find(Pattern("battlelist.png").similar(0.75))
+try: battlelist = find(battle_list_text)
 except: raise Exception("Battle list not found")
 bl_tlc_x = battlelist.getTopLeft().getX()
 bl_tlc_y = battlelist.getTopLeft().getY()
@@ -1002,18 +1024,18 @@ bl_slot1_y = bl_tlc_y + 33
 battlelist_region = Region(bl_tlc_x,bl_tlc_y,40,200)
 
 #Life and mana bars region
-try: life_mana_bars = find(Pattern("life_mana_bars.png").exact())
+try: life_mana_bars = find(life_mana_img)
 except: raise Exception("Life bars not found!")
 
 #Equipments region
-try: equip_coords = find("store_inbox.png")
+try: equip_coords = find(store_purse_img)
 except: raise Exception("Equipment not found!")
 equip_coords_x = equip_coords.getTopRight().getX()+5
 equip_coords_y = equip_coords.getTopRight().getY()
 equip_region = Region((equip_coords_x-115),equip_coords_y,110,163)
 
 #Minimap region
-try: minimap_area = find("minimap_aux.png")
+try: minimap_area = find(minimap_ref_img)
 except: raise Exception ("Minimap not found!")
 mma_aux_x = minimap_area.getTopLeft().getX()
 mma_aux_y = minimap_area.getTopLeft().getY()
@@ -1021,8 +1043,8 @@ minimap_area_x = mma_aux_x - 115
 minimap_area_y = mma_aux_y - 49
 
 try:
-    sub_zoom = find(Pattern("sub_zoom.png").exact())
-    add_zoom = find(Pattern("add_zoom.png").exact())
+    sub_zoom = find(sub_zoom_img)
+    add_zoom = find(add_zoom_img)
 except: raise Exception ("Zoom buttons not found!")
     
 #MAIN
@@ -1035,6 +1057,9 @@ startHealingThread()
 if vocation > 0: startAttackingThread()
 print " "
 
+if label == "hunt":
+    checkBattleList()
+
 while running == 1:
 
     encounter = -1
@@ -1046,4 +1071,6 @@ while running == 1:
 
     #gc.collect()
 
-else: log("END -")
+else: 
+    #popup("END")
+    log("END - you may close this window now")
