@@ -3,6 +3,7 @@
 #library imports
 import os
 import gc
+import java.lang.System as JSYS
 import subprocess
 import re
 import math
@@ -43,10 +44,7 @@ amulet_key = "k"
 food_key   = "u"
 dust_key   = "="
 poison_key = "i"
-haste_key  = "b"
-
-#user must remember to setup manually the game region
-game_region = Region(222,122,481,350)
+haste_key  = "v"
 
 #image references
 in_combat_icon = "battleon.png"
@@ -63,12 +61,15 @@ no_mana_text = Pattern("noenoughmana.png").similar(0.90)
 life_mana_img = Pattern("life_mana_bars.png").exact()
 add_zoom_img = Pattern("add_zoom.png").exact()
 sub_zoom_img = Pattern("sub_zoom.png").exact()
+gr_bottom_left_img = Pattern("gr_bottom_left.png").exact()
+gr_bottom_right_img = Pattern("gr_bottom_right.png").exact()
 minimap_ref_img = "minimap_aux.png"
 store_purse_img = "store_inbox.png"
 no_ring_img = "ring.png"
 no_amulet_img = "amulet.png"
-gold_converter_img = "gold_converter_img.png"
+gold_converter_img = Pattern("gold_converter_img.png").exact()
 stack_of_100_gold_img = Pattern("stack_of_100_gold_img.png").exact()
+deposit_container_img = Pattern("1632155643761.png").exact()
 
 #PIXEL ANALYZER
 
@@ -155,10 +156,11 @@ def waypointManager():
         wp = 1
         
     elif label == "hunt" and wp >= last_hunt_wp:
-        if drop_vials > 0 and running == 1: 
+
+        if drop_vials == "end" and running == 1: 
             checkBattleList()
             dropVials()
-        
+
         log("Checking conditions to leave hunt...")
         for condition in leave_conditions:
             index = (leave_conditions.index(condition)) + 1
@@ -181,16 +183,17 @@ def checkLeaveConditions(name,param):
     if "potion" in name:
         
         try:
+            #slower bug more reliable
             while param >= 0:
                 if name == "small health potion":    img_ref = potions.small_health_potion_dict[param]
                 if name == "mana potion":            img_ref = potions.mana_potion_dict[param]
                 if name == "strong mana potion":     img_ref = potions.strong_mana_potion_dict[param]
                 if name == "ultimate health potion": img_ref = potions.ultimate_health_potion_dict[param]  
-                #log("Checking if "+name+" <= "+str(param))
+                log("\t Checking if "+name+" <= "+str(param))
                 if exists(img_ref,0): return "leave"
                 else: 
                     if param == 0: param = -1
-                    else: param -= param
+                    else: param -= 10
             else: return "hunt" 
             
         except: 
@@ -267,18 +270,6 @@ def walkToNextWaypoint(wpList):
         click(wpList[1][0])
         hover(Location(x2,y2))
 
-        #if there is no way to the destination, 
-        #its possible that the character is trapped 
-        #in this case, force an attack
-        if check_no_way == 1:
-            if running == 1 and game_region.exists(there_is_no_way_text,0.5):
-                log("unreachable destination, possibly trapped")
-                type(Key.SPACE)
-                wait(0.3)
-                battlelist_region.waitVanish(battle_target_icon,5)
-                walkToNextWaypoint(wpList)
-            else: pass
-
         #check if should cast haste spell
         if cast_haste == []: pass
         elif label in cast_haste: type(haste)
@@ -312,14 +303,15 @@ def checkIsWalking(wpList):
             #while is walking and paralysed, use haste
             #if equip_region.exists(paralyse_icon,0): type(haste)
                      
-            if wpList[2] > 0: 
-                #if (not game_region.exists(there_is_no_way_text,0)) and (countTargets(wpList[2]) >= wpList[2]): 
-                if countTargets(wpList[2]) >= wpList[2]:
-                    type(Key.ESC)
-                    wait(0.3)
-                    checkBattleList()
-                    if running == 1: walkToNextWaypoint(wpList)
-                else: wait(1)
+            if wpList[2] > 0:
+                if (check_no_way == 1 and game_region.exists(there_is_no_way_text,0)): pass
+                else:
+                    if countTargets(wpList[2]) >= wpList[2]:
+                        type(Key.ESC)
+                        wait(0.3)
+                        checkBattleList()
+                        if running == 1: walkToNextWaypoint(wpList)
+                    else: wait(1)
             
         #if nothing changes on the screen for X seconds, add 1 to timer
         if not minimap_region.somethingChanged:
@@ -365,7 +357,7 @@ def resetRun():
         if next_label == "leave": break #if a condition is found, it must exit right away
 
     if next_label == "hunt":
-        log("Restarting hunt from the beginning")
+        log("Restarting hunt")
         label = "go_hunt"
         wp = 0
     else:
@@ -407,7 +399,6 @@ def checkBattleList():
     elif running == 0: return    
     else: 
         log("Battle list is clear")
-        if drop_vials == 2: dropVials()
         if encounter == 1 and loot_type == 3: lootAround(1)
         if dust_skin != [] and label == "hunt":
             try: skinCreatureCorpse() #list of corpse images
@@ -515,11 +506,6 @@ def healingThread(arg):
     else: print "Ending healing thread" 
                 
 def lifeTest(percent):
-
-    start_life_x = life_mana_bars.getCenter().getX()+9
-    end_life_x = life_mana_bars.getCenter().getX()+101
-    life_y = life_mana_bars.getCenter().getY()-7
- 
     test_x = (start_life_x + int((float(percent)/100) * (end_life_x - start_life_x)))   
     red = getPixelColorHealer(test_x,life_y,"life")
         
@@ -528,12 +514,7 @@ def lifeTest(percent):
     else:
         return 1
 
-def manaTest(percent):
-
-    start_mana_x = life_mana_bars.getCenter().getX()+9
-    end_mana_x = life_mana_bars.getCenter().getX()+101
-    mana_y = life_mana_bars.getCenter().getY()+6
-    
+def manaTest(percent):    
     test_x = (start_mana_x + int((float(percent)/100) * (end_mana_x - start_mana_x)))    
     blue = getPixelColorHealer(test_x,mana_y,"mana")
     if blue >= 200:
@@ -593,36 +574,32 @@ def startAttackingThread():
 #PERSISTENT ACTIONS ARE CHECKED EVERY TIME CHAR ARRIVES AT A WAYPOINT
 
 def persistentActions():
-    log("Checking persistent actions")
-    if cast_haste == 1: 
-        if equip_region.exists(paralyse_icon,0):
-            type(haste_key)
-    if eat_food == 1:
-        if equip_region.exists(food_icon,0):
-            type(food_key)
-    if cure_poison == 1:
-        if equip_region.exists(poison_icon,0):  
-            type(poison_key)
-    if equip_ring == 1:
-        if equip_region.exists(no_ring_img,0):
-            type(ring_key)
-    if equip_amulet == 1:
-        if equip_region.exists(no_amulet_img,0):
-            type(amulet_key)
-    if drop_items != []: dropListOfItems()
-    if convert_gold == 1: convertGoldFunction()
+    if running == 1:
+        log("Checking persistent actions")
+        if cast_haste == 1: 
+            if equip_region.exists(paralyse_icon,0):
+                type(haste_key)
+        if eat_food == 1:
+            if equip_region.exists(food_icon,0):
+                type(food_key)
+        if cure_poison == 1:
+            if equip_region.exists(poison_icon,0):  
+                type(poison_key)
+        if equip_ring == 1:
+            if equip_region.exists(no_ring_img,0):
+                type(ring_key)
+        if equip_amulet == 1:
+            if equip_region.exists(no_amulet_img,0):
+                type(amulet_key)
+        if drop_items != []: dropListOfItems()
+        if convert_gold == 1: convertGoldFunction()
+        if drop_vials == "always": dropVials()    
+                       
+#FUNCTIONS RELATED TO DROP ITEMS
 
-#CONVERT GOLD WITH ITEM "GOLD CONVERTER"
-#Store purse must be openned and "Gold Converter" must be visible
-def convertGoldFunction():
-    while exists(gold_converter_img,0) and exists(stack_of_100_gold_img):
-        click(gold_converter_img)
-        wait(1)
-        click(stack_of_100_gold_img)
-        log("100 gold converted to platinum sucessfully")
-    else: log("ERROR converting gold")
-        
-#DROP ITEMS ON THE GROUND
+#drop_vials = "never"  -> never drop vials
+#drop_vials = "end"    -> drop vials at end of each hunt cycle
+#drop_vials = "always" -> drop vials before going to the next waypoint
 
 def dropVials():
     log("Searching for empty vials")
@@ -650,12 +627,26 @@ def dropItemToFeet(sprite,name):
             wait(0.5)
     else: return
     
-#DEPOSIT ITEMS ON DEPOT
+#CONVERT GOLD WITH ITEM "GOLD CONVERTER"
+#Store purse must be open and "Gold Converter" must be visible/inside
+def convertGoldFunction():
+    try:
+        while exists(gold_converter_img,0) and exists(stack_of_100_gold_img):
+            click(gold_converter_img)
+            wait(1)
+            click(stack_of_100_gold_img)
+            log("Converting gold")
+        else: pass
+    except:
+        type("ESC")
+        return
+    
+#DEPOSIT ITEMS ON DEPOT/LOCKER
 
 def depositItem(container,list_of_items):
     log("Under construction")
-    #1) FIND LOCKER (N, S, W, E)
-    #2) CLICK IT
+    #1) FIND LOCKER (N, S, W, E) AND CLICK IT
+    #2) CLICK ON DEPOSIT
     #3) DEPOSIT ITEMS ACCORDINGLY TO USER SPECIFICATIONS
     return
 
@@ -787,7 +778,7 @@ def scriptSelector():
     lure_mode       = configs.get("lure_mode",0)    
     loot_type       = configs.get("loot_type",0)  
     drop_items      = configs.get("drop_items",0)   
-    drop_vials      = configs.get("drop_vials",0)   
+    drop_vials      = configs.get("drop_vials","never")   
     equip_ring      = configs.get("equip_ring",0) 
     equip_amulet    = configs.get("equip_amulet",0) 
     dust_skin       = configs.get("dust_skin",[])    
@@ -914,7 +905,6 @@ startConsole()
 log("Welcome to GameMaster\'s Bot!")
 
 #START OF EXECUTION
-game_region.highlight(0.5,"green") #expendable step - just to remind the user
 
 #sets running variable to 1
 running = 0
@@ -953,6 +943,28 @@ if not exists(ping_icon,0): type(Key.F8, KeyModifier.ALT)
 
 #6) Calculates regions based on game screen elements    
 #GAME REGION INFORMATIONS
+try:
+    gr_bl = find(gr_bottom_left_img)
+    gr_br = find(gr_bottom_right_img)
+    
+    gr_bl_x = gr_bl.getCenter().getX()-1
+    gr_bl_y = gr_bl.getCenter().getY()
+    
+    gr_br_x = gr_br.getCenter().getX()+4
+    gr_br_y = gr_br.getCenter().getY()+2
+    
+    gr_width = gr_br_x - gr_bl_x
+    gr_height = int(gr_width/1.35)
+    
+    gr_tl_y = gr_bl_y - gr_height
+    
+    game_region = Region(gr_bl_x-3,gr_tl_y,gr_width+4,gr_height)
+
+except:
+    #Ask user to setup manually the game region
+    game_region = selectRegion("Please select the game region")
+game_region.highlight(0.5,"green")
+
 #center
 gr_center_x = game_region.getCenter().getX()
 gr_center_y = game_region.getCenter().getY()
@@ -1009,7 +1021,16 @@ bl_slot1_y = bl_tlc_y + 33
 battlelist_region = Region(bl_tlc_x,bl_tlc_y,40,200)
 
 #Life and mana bars region
-try: life_mana_bars = find(life_mana_img)
+try: 
+    life_mana_bars = find(life_mana_img) 
+    #life location
+    start_life_x = life_mana_bars.getCenter().getX()+9
+    end_life_x = life_mana_bars.getCenter().getX()+101
+    life_y = life_mana_bars.getCenter().getY()-7
+    #mana location
+    start_mana_x = life_mana_bars.getCenter().getX()+9
+    end_mana_x = life_mana_bars.getCenter().getX()+101
+    mana_y = life_mana_bars.getCenter().getY()+6
 except: raise Exception("Life bars not found!")
 
 #Equipments region
@@ -1055,7 +1076,8 @@ while running == 1:
         
     waypointManager()
 
-    #gc.collect()
+    gc.collect()
+    JSYS.gc()
 
 else: 
     #popup("END")
